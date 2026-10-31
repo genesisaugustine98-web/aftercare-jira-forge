@@ -1,16 +1,17 @@
 # Aftercare — Release Impact
 
-Aftercare is a Jira Cloud Forge app that provides a project-level workspace for release-impact review.
+Aftercare is a Jira Cloud Forge app that provides the first project-context surface for an evidence-based release-impact product.
 
 ## Current capability: project context dashboard
 
-The first implementation replaces the Forge Hello World screen with a read-only Jira project dashboard. It:
+The first implementation is a read-only Jira project dashboard. It:
 
 - Reads the current project key from Forge's `useProductContext` hook.
 - Retrieves project metadata from Jira Cloud REST API v3.
-- Retrieves up to eight recently updated work items through the enhanced JQL search endpoint.
+- Retrieves up to eight recently updated work items through Jira's enhanced JQL search endpoint.
 - Shows each returned work item's key, summary, status, issue type, priority, assignee and update time.
 - Handles asynchronous context loading, API failures, empty results and manual refresh.
+- Tests query construction, JQL escaping, status mapping, project type mapping and API error messaging with Node's built-in test runner.
 
 The Jira requests are made through `requestJira` from `@forge/bridge`, which executes as the currently signed-in user. Jira project permissions and issue-security rules continue to apply.
 
@@ -18,7 +19,7 @@ The Jira requests are made through `requestJira` from `@forge/bridge`, which exe
 
 This dashboard is a project-context foundation, not yet a release-readiness engine. It does not currently inspect source-control changes, merge requests, CI/CD pipelines, security scans, build artifacts or deployment environments. It does not write to Jira, approve changes or authorize production releases.
 
-Those capabilities require separate integrations, evidence models and human-review controls. They must be implemented and tested before Aftercare presents any release-impact conclusion.
+The product thesis and adversarial validation plan lives at [`docs/product-thesis-and-validation.md`](../docs/product-thesis-and-validation.md). That plan defines the evidence model, GitLab-first integration sequence, threat model and release-readiness acceptance gates. Those capabilities must be implemented and tested before Aftercare presents any release-impact conclusion.
 
 ## Permissions
 
@@ -38,7 +39,7 @@ forge install --non-interactive --upgrade --site <your-site>.atlassian.net --pro
 
 Run Forge commands from this app directory. Replace the site placeholder with the Atlassian site where the app is installed.
 
-## Development
+## Development and checks
 
 Requirements:
 
@@ -46,14 +47,17 @@ Requirements:
 - npm
 - Atlassian Forge CLI authenticated to the target Atlassian site
 
-Install dependencies and run the available checks:
+Run the checks from this directory:
 
 ```bash
-npm install
+npm ci
 npm audit
+npm test
 npm run lint
 forge lint
 ```
+
+The automated GitHub Actions workflow runs dependency audit, unit/edge-case tests, ESLint and authenticated Forge lint when the repository secrets are configured.
 
 The Forge CLI bundles the UI Kit application when it is deployed or run through a tunnel.
 
@@ -64,9 +68,12 @@ manifest.yml
 src/
   frontend/
     index.jsx
+    project-dashboard-logic.mjs
+test/
+  project-dashboard-logic.test.mjs
 eslint.config.mjs
 package.json
 package-lock.json
 ```
 
-The current dashboard uses UI Kit and the Jira Bridge API directly. A backend resolver is not needed for this read-only stage. Backend processing and Forge storage can be introduced when the assessment and evidence-history features are designed.
+The current dashboard uses UI Kit and the Jira Bridge API directly. A backend resolver is not needed for this read-only stage. Backend processing, secure provider credentials and Forge storage can be introduced when the integration and evidence-history features are designed.
