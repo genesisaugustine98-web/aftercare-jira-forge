@@ -1,9 +1,13 @@
 # Aftercare — Release Impact
 
-A Jira Cloud Forge app for evidence-based release-impact review.
+Aftercare is intended to become an evidence-linked change-to-production assurance workspace, surfaced inside Jira.
 
-The Forge application source lives in [`aftercare-release-impact/`](aftercare-release-impact/). Its current milestone is a read-only Jira project context dashboard that displays project metadata and recently updated work items visible to the current Jira user.
+The Jira Forge source lives in [`aftercare-release-impact/`](aftercare-release-impact/). The current implementation is deliberately limited to a read-only project context dashboard: it reads project metadata and up to eight recent work items visible to the current Jira user. It is not yet a release-readiness engine.
 
-See the [application README](aftercare-release-impact/README.md) for capabilities, permission scope, development commands and the current product-scope boundary.
+## Product direction
 
-The dashboard does not yet analyse source changes, CI/CD results, security scans or deployment evidence, and it does not authorize releases.
+The differentiation is a traceable evidence chain from Jira change scope to source-control revisions, CI/tests, security results, deployments and operational evidence. Missing, stale, skipped, inaccessible and conflicting evidence must remain visible; Aftercare must never turn unknown evidence into a pass or authorize a production release.
+
+See the [product thesis and adversarial validation plan](docs/product-thesis-and-validation.md) for the market pressure test, architecture, threat model, failure scenarios and acceptance gates.
+
+See the [application README](aftercare-release-impact/README.md) for current capabilities, permission scope and development commands.
