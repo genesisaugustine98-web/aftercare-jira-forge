@@ -43,5 +43,10 @@ jobs:
       - name: Install Forge CLI
         run: npm install --global @forge/cli@15.0.0
 
+      # Forge CLI asks about usage analytics on first run. Set the preference
+      # explicitly to false so validation is deterministic in non-TTY CI.
+      - name: Disable Forge CLI usage analytics in CI
+        run: forge settings set usage-analytics false
+
       - name: Validate Forge app and manifest
         run: forge lint
