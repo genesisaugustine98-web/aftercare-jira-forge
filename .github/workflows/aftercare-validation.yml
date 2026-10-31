@@ -3,10 +3,12 @@ name: Aftercare validation
 on:
   push:
     branches:
+      - main
       - feat/project-context-dashboard
   pull_request:
     paths:
       - "aftercare-release-impact/**"
+      - "docs/**"
       - ".github/workflows/aftercare-validation.yml"
 
 permissions:
@@ -14,7 +16,7 @@ permissions:
 
 jobs:
   validate:
-    name: Audit, lint and Forge validation
+    name: Audit, test, lint and Forge validation
     runs-on: ubuntu-latest
     env:
       FORGE_AUTH_CONFIGURED: ${{ secrets.FORGE_EMAIL != '' && secrets.FORGE_API_TOKEN != '' }}
@@ -39,6 +41,9 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
 
+      - name: Run unit and edge-case tests
+        run: npm test
+
       - name: Run ESLint
         run: npm run lint
 
@@ -62,4 +67,4 @@ jobs:
       - name: Explain skipped Forge validation
         if: env.FORGE_AUTH_CONFIGURED != 'true'
         run: |
-          echo "::notice::Forge lint was skipped because FORGE_EMAIL and FORGE_API_TOKEN are not configured as GitHub Actions secrets. Dependency audit and ESLint still ran. Add both secrets to enable authenticated Forge validation."
+          echo "::notice::Forge lint was skipped because FORGE_EMAIL and FORGE_API_TOKEN are not configured as GitHub Actions secrets. Dependency audit, tests and ESLint still ran. Add both secrets to enable authenticated Forge validation."
