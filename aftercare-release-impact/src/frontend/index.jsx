@@ -14,22 +14,11 @@ import ForgeReconciler, {
 import { requestJira } from '@forge/bridge';
 import {
   MAX_RECENT_ISSUES,
-  buildRecentIssuesPath,
+  fetchProjectDashboard,
   formatUpdatedDate,
-  getJiraErrorMessage,
   getProjectTypeLabel,
   getStatusAppearance,
 } from './project-dashboard-logic.mjs';
-
-// Keep the API error formatter in the pure logic module so its edge cases can
-// be tested without needing a live Jira tenant.
-async function readJiraJson(response, resource) {
-  if (!response.ok) {
-    throw new Error(getJiraErrorMessage(response.status, resource));
-  }
-
-  return response.json();
-}
 
 const App = () => {
   // Forge provides the project key for the Jira project page. The context is
@@ -67,28 +56,13 @@ const App = () => {
       try {
         // requestJira runs as the currently signed-in user. Jira's own project
         // permissions and issue-security rules therefore remain in force.
-        const projectPath = `/rest/api/3/project/${encodeURIComponent(projectKey)}`;
-        const issuesPath = buildRecentIssuesPath(projectKey);
-
-        const [projectResponse, issuesResponse] = await Promise.all([
-          requestJira(projectPath, {
-            headers: { Accept: 'application/json' },
-          }),
-          requestJira(issuesPath, {
-            headers: { Accept: 'application/json' },
-          }),
-        ]);
-
-        const [project, issueResult] = await Promise.all([
-          readJiraJson(projectResponse, 'project details'),
-          readJiraJson(issuesResponse, 'recent project work items'),
-        ]);
+        const result = await fetchProjectDashboard(projectKey, requestJira);
 
         if (isActive) {
           setDashboard({
             status: 'ready',
-            project,
-            issues: Array.isArray(issueResult.issues) ? issueResult.issues : [],
+            project: result.project,
+            issues: result.issues,
             error: null,
           });
         }
