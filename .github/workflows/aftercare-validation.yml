@@ -10,6 +10,7 @@ on:
       - "aftercare-release-impact/**"
       - "docs/**"
       - ".github/workflows/aftercare-validation.yml"
+      - ".github/workflows/aftercare-install-development.yml"
 
 permissions:
   contents: read
