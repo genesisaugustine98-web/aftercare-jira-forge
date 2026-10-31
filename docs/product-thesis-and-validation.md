@@ -13,9 +13,17 @@ The current Forge app is only the Jira project-context shell. It does not yet de
 
 A close substitute already exists: [Release Readiness for Jira](https://marketplace.atlassian.com/apps/2207519188/release-readiness-for-jira). Its listing describes configurable JQL criteria, accountable owners, linked tests, evidence gaps, time history and a locked decision record. It was listed with a 7 October 2026 release and, at the time of this review, a very small install/review footprint. That small footprint is not evidence of demand or product-market fit, but the feature overlap is direct: a Jira-only readiness checklist is not a strong differentiator.
 
-Other adjacent categories include:
-- [Impact Analysis for Jira](https://marketplace.atlassian.com/apps/4251492671/impact-analysis-for-jira), which focuses on Jira configuration dependencies and administrative change impact.
-- [Issue, Sprint & Release Delivery Health Check for Jira](https://marketplace.atlassian.com/apps/1679578961/issue-sprint-release-delivery-health-check-for-jira), which focuses on issue/sprint/release flow metrics and AI recommendations.
+Other adjacent categories and platform capabilities tighten the bar further:
+
+| Existing option | What it already covers | Consequence for Aftercare |
+|---|---|---|
+| [Jira native development/deployment integration](https://support.atlassian.com/jira-cloud-administration/docs/integrate-gitlab-with-jira/) | Surfaces GitLab commits, branches, merge requests, builds and deployments against Jira work items when issue keys are referenced. | Do not build a thinner mirror of Jira's Development panel or Releases page. |
+| [GitLab for Jira Cloud](https://marketplace.atlassian.com/apps/1221011/gitlab-for-jira-cloud) | Provides linked development-panel, CI/CD build, deployment and feature-flag information. | A GitLab connector alone is not differentiation. |
+| [GitLab merge-request approval/security policies](https://docs.gitlab.com/user/project/merge_requests/approvals/rules/) | Enforces reviewer counts and, on eligible tiers, security approvals based on scanner results. | Integrate with and complement native controls; do not pretend to replace protected-branch rules or GitLab approval enforcement. |
+| [Impact Analysis for Jira](https://marketplace.atlassian.com/apps/4251492671/impact-analysis-for-jira) | Focuses on Jira configuration dependencies and administrative change impact. | Stay focused on software change-to-production evidence, not Jira administration. |
+| [Issue, Sprint & Release Delivery Health Check for Jira](https://marketplace.atlassian.com/apps/1679578961/issue-sprint-release-delivery-health-check-for-jira) | Focuses on issue/sprint/release flow metrics and AI recommendations. | Do not compete on another generic health score. |
+
+Atlassian's native GitLab integration is particularly important: it already links Jira work items to branches, commits, merge requests, builds and deployments using issue-key references. GitLab also has merge-request approval rules and security approval policies (with some security-policy capabilities tier-dependent). Aftercare must therefore add verification and governance that those tools do not provide as one coherent, revision-bound evidence dossier—not merely re-display their data.
 
 ### What must be different
 
