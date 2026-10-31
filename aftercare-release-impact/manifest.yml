@@ -1,6 +1,6 @@
 modules:
   jira:projectPage:
-    - key: aftercare-release-impact-hello-world-project-page
+    - key: aftercare-release-impact-project-page
       resource: main
       render: native
       title: Aftercare
