@@ -23,11 +23,16 @@ export default [
 
     rules: {
       "no-undef": "error",
-      "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],
       "no-unreachable": "error",
       "no-constant-condition": "error",
       "no-duplicate-imports": "error",
       "react-hooks/rules-of-hooks": "error"
+    }
+  },
+  {
+    files: ["src/**/*.mjs", "test/**/*.mjs"],
+    rules: {
+      "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }]
     }
   }
 ];
