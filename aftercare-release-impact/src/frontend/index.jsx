@@ -12,91 +12,23 @@ import ForgeReconciler, {
   useProductContext,
 } from '@forge/react';
 import { requestJira } from '@forge/bridge';
+import {
+  MAX_RECENT_ISSUES,
+  buildRecentIssuesPath,
+  formatUpdatedDate,
+  getJiraErrorMessage,
+  getProjectTypeLabel,
+  getStatusAppearance,
+} from './project-dashboard-logic.mjs';
 
-const MAX_RECENT_ISSUES = 8;
-const ISSUE_FIELDS = 'summary,status,issuetype,priority,updated,assignee';
-
-// Convert Jira HTTP failures into guidance that is useful to a project user.
-// Avoid displaying raw API responses, which may contain implementation details.
-function getJiraErrorMessage(status, resource) {
-  if (status === 401 || status === 403) {
-    return `Jira did not allow access to ${resource}. Confirm that you can browse this project and that the Aftercare app has been granted its read permission.`;
-  }
-
-  if (status === 404) {
-    return `Jira could not find ${resource}, or your account cannot view it.`;
-  }
-
-  if (status === 429) {
-    return `Jira is rate-limiting requests for ${resource}. Wait briefly and refresh.`;
-  }
-
-  return `Aftercare could not load ${resource} (HTTP ${status}). Please try again.`;
-}
-
+// Keep the API error formatter in the pure logic module so its edge cases can
+// be tested without needing a live Jira tenant.
 async function readJiraJson(response, resource) {
   if (!response.ok) {
     throw new Error(getJiraErrorMessage(response.status, resource));
   }
 
   return response.json();
-}
-
-function buildRecentIssuesPath(projectKey) {
-  // Project keys are supplied by Jira's project-page context. Encode every
-  // query value so project names or keys cannot alter the JQL request.
-  const jql = `project = "${projectKey}" ORDER BY updated DESC`;
-  const query = [
-    [ 'jql', jql ],
-    [ 'maxResults', String(MAX_RECENT_ISSUES) ],
-    [ 'fields', ISSUE_FIELDS ],
-  ]
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
-
-  return `/rest/api/3/search/jql?${query}`;
-}
-
-function getProjectTypeLabel(projectTypeKey) {
-  const labels = {
-    software: 'Software project',
-    business: 'Business project',
-    service_desk: 'Service management project',
-  };
-
-  return labels[projectTypeKey] || 'Jira project';
-}
-
-function getStatusAppearance(status) {
-  const normalizedStatus = (status || '').toLowerCase();
-
-  if (['done', 'closed', 'resolved'].includes(normalizedStatus)) {
-    return 'success';
-  }
-
-  if (['blocked', 'failed'].includes(normalizedStatus)) {
-    return 'danger';
-  }
-
-  if (['in progress', 'in review', 'in development'].includes(normalizedStatus)) {
-    return 'information';
-  }
-
-  return 'neutral';
-}
-
-function formatUpdatedDate(value) {
-  if (!value) {
-    return 'Update time unavailable';
-  }
-
-  const updatedDate = new Date(value);
-
-  if (Number.isNaN(updatedDate.getTime())) {
-    return 'Update time unavailable';
-  }
-
-  return updatedDate.toLocaleString();
 }
 
 const App = () => {
@@ -301,7 +233,7 @@ const App = () => {
                   <Text>
                     {issueType}
                     {priority ? ` · ${priority}` : ''}
-                    { ` · ${assignee} · Updated ${formatUpdatedDate(fields.updated)}` }
+                    {` · ${assignee} · Updated ${formatUpdatedDate(fields.updated)}`}
                   </Text>
                 </Stack>
               );
