@@ -16,6 +16,8 @@ jobs:
   validate:
     name: Audit, lint and Forge validation
     runs-on: ubuntu-latest
+    env:
+      FORGE_AUTH_CONFIGURED: ${{ secrets.FORGE_EMAIL != '' && secrets.FORGE_API_TOKEN != '' }}
     defaults:
       run:
         working-directory: aftercare-release-impact
@@ -41,12 +43,23 @@ jobs:
         run: npm run lint
 
       - name: Install Forge CLI
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
         run: npm install --global @forge/cli@15.0.0
 
-      # Forge CLI asks about usage analytics on first run. Set the preference
-      # explicitly to false so validation is deterministic in non-TTY CI.
-      - name: Disable Forge CLI usage analytics in CI
+      # Keep analytics disabled in CI. Forge authentication is supplied
+      # through GitHub Actions secrets, never through committed files.
+      - name: Disable Forge CLI usage analytics
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
         run: forge settings set usage-analytics false
 
       - name: Validate Forge app and manifest
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
+        env:
+          FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+          FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
         run: forge lint
+
+      - name: Explain skipped Forge validation
+        if: env.FORGE_AUTH_CONFIGURED != 'true'
+        run: |
+          echo "::notice::Forge lint was skipped because FORGE_EMAIL and FORGE_API_TOKEN are not configured as GitHub Actions secrets. Dependency audit and ESLint still ran. Add both secrets to enable authenticated Forge validation."
