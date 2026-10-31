@@ -5,11 +5,20 @@ import {
   ISSUE_FIELDS,
   MAX_RECENT_ISSUES,
   buildRecentIssuesPath,
+  fetchProjectDashboard,
   formatUpdatedDate,
   getJiraErrorMessage,
   getProjectTypeLabel,
   getStatusAppearance,
 } from '../src/frontend/project-dashboard-logic.mjs';
+
+function response(body, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  };
+}
 
 test('builds an enhanced JQL query scoped to the selected project', () => {
   const path = buildRecentIssuesPath('AFTER');
@@ -73,4 +82,67 @@ test('formats valid update timestamps and degrades safely for missing or invalid
   assert.equal(formatUpdatedDate(null), 'Update time unavailable');
   assert.equal(formatUpdatedDate('not-a-date'), 'Update time unavailable');
   assert.notEqual(formatUpdatedDate('2026-10-31T09:00:00.000Z'), 'Update time unavailable');
+});
+
+test('loads Jira project details and recent items as the current user', async () => {
+  const calls = [];
+  const project = { id: '10001', key: 'AFTER', name: 'Aftercare', projectTypeKey: 'software' };
+  const issues = [{ id: '20001', key: 'AFTER-1', fields: { summary: 'Release change' } }];
+
+  const result = await fetchProjectDashboard('AFTER', async (path, options) => {
+    calls.push({ path, options });
+    return path.includes('/search/jql') ? response({ issues }) : response(project);
+  });
+
+  assert.equal(calls.length, 2);
+  assert.ok(calls.some((call) => call.path === '/rest/api/3/project/AFTER'));
+  assert.ok(calls.some((call) => call.path.startsWith('/rest/api/3/search/jql?')));
+  assert.ok(calls.every((call) => call.options.headers.Accept === 'application/json'));
+  assert.deepEqual(result, { project, issues });
+});
+
+test('handles an empty or malformed issues collection without inventing work items', async () => {
+  const result = await fetchProjectDashboard('AFTER', async (path) => (
+    path.includes('/search/jql') ? response({ issues: null }) : response({ key: 'AFTER' })
+  ));
+
+  assert.deepEqual(result.issues, []);
+});
+
+test('encodes the project path segment in the metadata request', async () => {
+  const calls = [];
+
+  await fetchProjectDashboard('SAFE/KEY', async (path) => {
+    calls.push(path);
+    return path.includes('/search/jql') ? response({ issues: [] }) : response({ key: 'SAFE/KEY' });
+  });
+
+  assert.ok(calls.includes('/rest/api/3/project/SAFE%2FKEY'));
+});
+
+test('surfaces permission failures rather than presenting partial data as complete', async () => {
+  await assert.rejects(
+    () => fetchProjectDashboard('AFTER', async (path) => (
+      path.includes('/search/jql') ? response({}, 403) : response({ key: 'AFTER' })
+    )),
+    /did not allow access to recent project work items/
+  );
+});
+
+test('rejects an invalid Jira project response instead of crashing during rendering', async () => {
+  await assert.rejects(
+    () => fetchProjectDashboard('AFTER', async (path) => (
+      path.includes('/search/jql') ? response({ issues: [] }) : response(null)
+    )),
+    /invalid project response/
+  );
+});
+
+test('propagates provider/network failures so the UI can show its retry state', async () => {
+  await assert.rejects(
+    () => fetchProjectDashboard('AFTER', async () => {
+      throw new Error('connection reset');
+    }),
+    /connection reset/
+  );
 });
