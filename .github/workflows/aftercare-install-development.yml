@@ -1,0 +1,65 @@
+name: Install Aftercare on Jira development site
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization:
+        description: "Confirm: install Aftercare (DEVELOPMENT) on agkoodaga.atlassian.net with read:jira-work access."
+        required: true
+        type: choice
+        options:
+          - I authorize this development installation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aftercare-jira-development-install
+  cancel-in-progress: false
+
+jobs:
+  install:
+    name: Install Aftercare on agkoodaga.atlassian.net
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aftercare-release-impact
+    env:
+      FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+      FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: aftercare-release-impact/package-lock.json
+
+      - name: Check Forge credentials are configured
+        shell: bash
+        run: |
+          if [[ -z "$FORGE_EMAIL" || -z "$FORGE_API_TOKEN" ]]; then
+            echo "::error::Add FORGE_EMAIL and FORGE_API_TOKEN as GitHub Actions secrets before running this workflow."
+            exit 1
+          fi
+
+      - name: Install locked app dependencies
+        run: npm ci
+
+      - name: Install Forge CLI
+        run: npm install --global @forge/cli@15.0.0
+
+      - name: Disable Forge CLI usage analytics
+        run: forge settings set usage-analytics false
+
+      - name: Validate the app manifest
+        run: forge lint
+
+      # This workflow is manual by design. The required authorization input
+      # makes the site-level installation an explicit user action.
+      - name: Install Aftercare into Jira development
+        run: forge install --non-interactive --confirm-scopes --site agkoodaga.atlassian.net --product Jira --environment development
