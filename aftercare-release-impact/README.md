@@ -1,39 +1,72 @@
-# Forge Hello World
+# Aftercare — Release Impact
 
-This project contains a Forge app written in Javascript that displays `Hello World!` in a Jira project page. 
+Aftercare is a Jira Cloud Forge app that provides a project-level workspace for release-impact review.
 
-See [developer.atlassian.com/platform/forge/](https://developer.atlassian.com/platform/forge) for documentation and tutorials explaining Forge.
+## Current capability: project context dashboard
 
-## Requirements
+The first implementation replaces the Forge Hello World screen with a read-only Jira project dashboard. It:
 
-See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
+- Reads the current project key from Forge's `useProductContext` hook.
+- Retrieves project metadata from Jira Cloud REST API v3.
+- Retrieves up to eight recently updated work items through the enhanced JQL search endpoint.
+- Shows each returned work item's key, summary, status, issue type, priority, assignee and update time.
+- Handles asynchronous context loading, API failures, empty results and manual refresh.
 
-## Quick start
-- Install dependecies
+The Jira requests are made through `requestJira` from `@forge/bridge`, which executes as the currently signed-in user. Jira project permissions and issue-security rules continue to apply.
+
+## Explicit scope boundary
+
+This dashboard is a project-context foundation, not yet a release-readiness engine. It does not currently inspect source-control changes, merge requests, CI/CD pipelines, security scans, build artifacts or deployment environments. It does not write to Jira, approve changes or authorize production releases.
+
+Those capabilities require separate integrations, evidence models and human-review controls. They must be implemented and tested before Aftercare presents any release-impact conclusion.
+
+## Permissions
+
+The manifest declares the classic OAuth scope:
+
+- `read:jira-work` — required for the read-only project and work-item requests.
+
+Users must also have the applicable Jira Browse Projects and issue visibility permissions. The app does not request Jira write scopes.
+
+Because this release adds a permission scope, an existing installation must be redeployed and upgraded after the scope is approved:
+
+```bash
+forge lint
+forge deploy --non-interactive --e development
+forge install --non-interactive --upgrade --site <your-site>.atlassian.net --product jira --environment development
 ```
+
+Run Forge commands from this app directory. Replace the site placeholder with the Atlassian site where the app is installed.
+
+## Development
+
+Requirements:
+
+- Node.js 24
+- npm
+- Atlassian Forge CLI authenticated to the target Atlassian site
+
+Install dependencies and run the available checks:
+
+```bash
 npm install
-```
-- Modify your app frontend by editing the `src/frontend/index.jsx` file.
-
-- Modify your app backend by editing the `src/resolvers/index.js` file to define resolver functions. See [Forge resolvers](https://developer.atlassian.com/platform/forge/runtime-reference/custom-ui-resolver/) for documentation on resolver functions.
-
-- Build and deploy your app by running:
-```
-forge deploy
+npm audit
+npm run lint
+forge lint
 ```
 
-- Install your app in an Atlassian site by running:
-```
-forge install
+The Forge CLI bundles the UI Kit application when it is deployed or run through a tunnel.
+
+## Application structure
+
+```text
+manifest.yml
+src/
+  frontend/
+    index.jsx
+eslint.config.mjs
+package.json
+package-lock.json
 ```
 
-- Develop your app by running `forge tunnel` to proxy invocations locally:
-```
-forge tunnel
-```
-
-### Notes
-- Use the `forge deploy` command when you want to persist code changes.
-- Use the `forge install` command when you want to install the app on a new site.
-- Once the app is installed on a site, the site picks up the new app changes you deploy without needing to rerun the install command.
-
+The current dashboard uses UI Kit and the Jira Bridge API directly. A backend resolver is not needed for this read-only stage. Backend processing and Forge storage can be introduced when the assessment and evidence-history features are designed.
