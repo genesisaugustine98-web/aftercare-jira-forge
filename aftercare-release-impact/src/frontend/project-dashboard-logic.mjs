@@ -84,3 +84,43 @@ export function formatUpdatedDate(value) {
 
   return updatedDate.toLocaleString();
 }
+
+async function readJiraJson(response, resource) {
+  if (!response.ok) {
+    throw new Error(getJiraErrorMessage(response.status, resource));
+  }
+
+  return response.json();
+}
+
+export async function fetchProjectDashboard(projectKey, requestJira) {
+  if (typeof requestJira !== 'function') {
+    throw new TypeError('A Jira request function is required.');
+  }
+
+  const projectPath = `/rest/api/3/project/${encodeURIComponent(projectKey)}`;
+  const issuesPath = buildRecentIssuesPath(projectKey);
+
+  const [projectResponse, issuesResponse] = await Promise.all([
+    requestJira(projectPath, {
+      headers: { Accept: 'application/json' },
+    }),
+    requestJira(issuesPath, {
+      headers: { Accept: 'application/json' },
+    }),
+  ]);
+
+  const [project, issueResult] = await Promise.all([
+    readJiraJson(projectResponse, 'project details'),
+    readJiraJson(issuesResponse, 'recent project work items'),
+  ]);
+
+  if (!project || typeof project !== 'object' || Array.isArray(project)) {
+    throw new Error('Jira returned an invalid project response. Please refresh and try again.');
+  }
+
+  return {
+    project,
+    issues: Array.isArray(issueResult?.issues) ? issueResult.issues : [],
+  };
+}
