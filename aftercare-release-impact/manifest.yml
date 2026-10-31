@@ -1,0 +1,20 @@
+modules:
+  jira:projectPage:
+    - key: aftercare-release-impact-hello-world-project-page
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: aftercare-release-impact
+  function:
+    - key: resolver
+      handler: index.handler
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/65e458bd-412c-4268-afe9-7a152d74f768
