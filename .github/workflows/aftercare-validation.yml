@@ -1,0 +1,79 @@
+name: Aftercare validation
+
+on:
+  push:
+    branches:
+      - main
+      - feat/project-context-dashboard
+  pull_request:
+    paths:
+      - "aftercare-release-impact/**"
+      - "docs/**"
+      - ".github/workflows/aftercare-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Audit, test, lint and Forge validation
+    runs-on: ubuntu-latest
+    env:
+      FORGE_AUTH_CONFIGURED: ${{ secrets.FORGE_EMAIL != '' && secrets.FORGE_API_TOKEN != '' }}
+    defaults:
+      run:
+        working-directory: aftercare-release-impact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: aftercare-release-impact/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: Run unit and edge-case tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Install Forge CLI
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
+        run: npm install --global @forge/cli@15.0.0
+
+      # Keep analytics disabled in CI. Forge authentication is supplied
+      # through GitHub Actions secrets, never through committed files.
+      - name: Disable Forge CLI usage analytics
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
+        run: forge settings set usage-analytics false
+
+      - name: Validate Forge app and manifest
+        if: env.FORGE_AUTH_CONFIGURED == 'true'
+        env:
+          FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+          FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+        run: forge lint
+
+      # A successful merge to main publishes only to the development
+      # environment. Installation/upgrade remains a separate site-level step.
+      - name: Deploy Forge app to development
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.FORGE_AUTH_CONFIGURED == 'true'
+        env:
+          FORGE_EMAIL: ${{ secrets.FORGE_EMAIL }}
+          FORGE_API_TOKEN: ${{ secrets.FORGE_API_TOKEN }}
+        run: forge deploy --non-interactive --e development
+
+      - name: Explain skipped Forge validation
+        if: env.FORGE_AUTH_CONFIGURED != 'true'
+        run: |
+          echo "::notice::Forge lint was skipped because FORGE_EMAIL and FORGE_API_TOKEN are not configured as GitHub Actions secrets. Dependency audit, tests and ESLint still ran. Add both secrets to enable authenticated Forge validation."

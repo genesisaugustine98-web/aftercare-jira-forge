@@ -1,0 +1,30 @@
+{
+  "name": "jira-project-page-ui-kit",
+  "version": "1.1.52-next.14",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "lint": "eslint src/**/* test/**/*.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1"
+  },
+  "dependencies": {
+    "@forge/api": "^8.4.0",
+    "@forge/bridge": "7.2.1-next.13",
+    "@forge/react": "^12.4.0",
+    "@forge/resolver": "^2.0.2",
+    "react": "^18.2.0"
+  },
+  "overrides": {
+    "prosemirror-view": "1.42.8",
+    "@forge/manifest": {
+      "glob": "14.0.3"
+    },
+    "eslint": {
+      "minimatch": "11.0.3"
+    }
+  }
+}
