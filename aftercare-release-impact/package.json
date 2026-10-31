@@ -4,7 +4,8 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "lint": "eslint src/**/*"
+    "lint": "eslint src/**/* test/**/*.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
     "eslint": "10.14.0",
