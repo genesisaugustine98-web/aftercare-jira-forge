@@ -186,3 +186,24 @@ test('returns needs-review when configured evidence is entirely absent', () => {
   assert.equal(summary.hasBlockingEvidence, true);
   assert.equal(summary.outcome, 'needs_review');
 });
+
+test('missing, unavailable and not-run records do not satisfy required coverage', () => {
+  const assessments = [
+    { kind: 'pipeline', status: EVIDENCE_STATUS.MISSING },
+    { kind: 'test_suite', status: EVIDENCE_STATUS.UNAVAILABLE },
+    { kind: 'security_scan_execution', status: EVIDENCE_STATUS.NOT_RUN },
+  ];
+  const summary = summarizeEvidence(assessments, [
+    'pipeline',
+    'test_suite',
+    'security_scan_execution',
+  ]);
+
+  assert.deepEqual(summary.missingKinds, [
+    'pipeline',
+    'test_suite',
+    'security_scan_execution',
+  ]);
+  assert.equal(summary.coverage, 'incomplete');
+  assert.equal(summary.outcome, 'needs_review');
+});
