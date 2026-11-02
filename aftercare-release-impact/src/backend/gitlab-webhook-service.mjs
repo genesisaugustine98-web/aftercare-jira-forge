@@ -116,6 +116,20 @@ function buildUnavailableSnapshot(issueKey, message, now) {
 }
 
 async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, now }) {
+  if (await store.get(key(projectKey, 'mr-index-incomplete'))
+    || await store.get(key(projectKey, `issue-index-incomplete.${issueKey}`))) {
+    const snapshot = {
+      status: 'incomplete',
+      issueKey,
+      message: 'The GitLab merge-request index exceeded the safe storage limit; absence cannot be established.',
+      assessments: [],
+      summary: summarizeEvidence([], REQUIRED_KINDS),
+      fetchedAt: new Date(now).toISOString(),
+    };
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    return snapshot;
+  }
+
   const mrIids = await getIndex(store, issueMrIndexKey(projectKey, issueKey));
   if (mrIids.length === 0) {
     const snapshot = {
@@ -191,6 +205,23 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
   ));
   const selectedPipeline = candidates[0] || null;
   const assessments = [];
+
+  if (await store.get(key(projectKey, 'pipeline-index-incomplete'))) {
+    assessments.push(assessEvidence({
+      evidence: makeMissingEvidence({
+        id: `gitlab:incomplete-pipeline-index:${projectId}`,
+        kind: 'ci_pipeline_collection',
+        sourceUrl: mr.webUrl,
+        commitSha: expectedCommitSha,
+        now,
+        status: EVIDENCE_STATUS.UNAVAILABLE,
+        reason: 'The GitLab pipeline index exceeded the safe storage limit.',
+      }),
+      expectedCommitSha,
+      now,
+      maxAgeMs: MAX_AGE_MS,
+    }));
+  }
 
   if (!selectedPipeline) {
     assessments.push(assessEvidence({
