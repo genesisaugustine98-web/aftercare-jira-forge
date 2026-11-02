@@ -213,6 +213,7 @@ test('does not pass a pipeline when GitLab has no test report', async () => {
   });
 
   assert.equal(result.status, 'needs_review');
+  assert.equal(result.summary.counts.missing, 1);
   assert.equal(result.summary.missingKinds.includes('test_suite'), true);
 });
 
