@@ -46,6 +46,7 @@ const App = () => {
   const [gitLabProjectId, setGitLabProjectId] = useState('');
   const [gitLabToken, setGitLabToken] = useState('');
   const [gitLabBusy, setGitLabBusy] = useState(false);
+  const [showGitLabTokenForm, setShowGitLabTokenForm] = useState(false);
   const [gitLabError, setGitLabError] = useState(null);
   const [gitLabMessage, setGitLabMessage] = useState(null);
   const [evidenceByIssue, setEvidenceByIssue] = useState({});
@@ -65,6 +66,7 @@ const App = () => {
       .then((result) => {
         if (isActive) {
           setGitLabConnection({ status: 'ready', ...result });
+          setGitLabProjectId(result.project?.projectId ? String(result.project.projectId) : '');
         }
       })
       .catch((error) => {
@@ -101,6 +103,8 @@ const App = () => {
         canManage: true,
         project: result.project,
       });
+      setGitLabProjectId(String(result.project.id));
+      setShowGitLabTokenForm(false);
       setGitLabToken('');
       setGitLabMessage('GitLab is connected. Its access token is stored encrypted and is never shown again.');
     } catch (error) {
@@ -123,6 +127,7 @@ const App = () => {
         canManage: true,
         project: null,
       });
+      setShowGitLabTokenForm(false);
       setEvidenceByIssue({});
       setGitLabProjectId('');
       setGitLabMessage('GitLab has been disconnected and its stored access token deleted.');
@@ -294,7 +299,7 @@ const App = () => {
               this project's connected GitLab evidence.
             </Text>
           </SectionMessage>
-        ) : gitLabConnection.connected ? (
+        ) : gitLabConnection.connected && !showGitLabTokenForm ? (
           <SectionMessage appearance="success" title="GitLab connected">
             <Stack space="space.100">
               <Text>
@@ -307,6 +312,9 @@ const App = () => {
                 after 90 days; GitLab may expire it sooner.
               </Text>
               <Inline>
+                <Button onClick={() => setShowGitLabTokenForm(true)} isDisabled={gitLabBusy}>
+                  Replace access token
+                </Button>
                 <Button onClick={disconnectGitLab} isDisabled={gitLabBusy}>
                   Disconnect GitLab
                 </Button>
@@ -314,7 +322,7 @@ const App = () => {
             </Stack>
           </SectionMessage>
         ) : (
-          <SectionMessage appearance="information" title="Connect a GitLab project">
+          <SectionMessage appearance="information" title={gitLabConnection.connected ? 'Replace GitLab access token' : 'Connect a GitLab project'}>
             <Stack space="space.100">
               <Text>
                 Connect one GitLab.com project using an access token with the
@@ -341,8 +349,19 @@ const App = () => {
                   onClick={connectGitLab}
                   isDisabled={gitLabBusy || !gitLabProjectId.trim() || !gitLabToken.trim()}
                 >
-                  Connect GitLab
+                  {gitLabConnection.connected ? 'Update access token' : 'Connect GitLab'}
                 </Button>
+                {gitLabConnection.connected ? (
+                  <Button
+                    onClick={() => {
+                      setShowGitLabTokenForm(false);
+                      setGitLabToken('');
+                    }}
+                    isDisabled={gitLabBusy}
+                  >
+                    Cancel
+                  </Button>
+                ) : null}
               </Inline>
             </Stack>
           </SectionMessage>
