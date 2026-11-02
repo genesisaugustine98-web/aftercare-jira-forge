@@ -13,7 +13,7 @@ function makeStore() {
   const values = new Map();
   return {
     get: async (key) => values.get(key),
-    set: async (key, value) => { values.set(key, structuredClone(value)); },
+    set: async (key, value) => { values.set(key, JSON.parse(JSON.stringify(value))); },
     values,
   };
 }
