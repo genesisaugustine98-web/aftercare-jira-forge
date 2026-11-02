@@ -5,8 +5,8 @@ import { GitLabApiError, fetchGitLabProject } from './backend/gitlab-client.mjs'
 import { collectGitLabIssueEvidence } from './backend/gitlab-evidence-service.mjs';
 
 const resolver = new Resolver();
-const GITLAB_TOKEN_KEY = 'aftercare.gitlab.access-token';
-const GITLAB_CONFIG_KEY = 'aftercare.gitlab.project-config';
+const getGitLabTokenKey = (projectKey) => `aftercare.gitlab.${projectKey}.access-token`;
+const getGitLabConfigKey = (projectKey) => `aftercare.gitlab.${projectKey}.project-config`;
 
 function getProjectKey(context, payload) {
   const projectKey = context?.extension?.project?.key || payload?.projectKey;
@@ -59,8 +59,8 @@ resolver.define('getGitLabConnectionStatus', async ({ payload, context }) => {
   }
 
   const [config, token] = await Promise.all([
-    kvs.get(GITLAB_CONFIG_KEY),
-    kvs.getSecret(GITLAB_TOKEN_KEY),
+    kvs.get(getGitLabConfigKey(projectKey)),
+    kvs.getSecret(getGitLabTokenKey(projectKey)),
   ]);
 
   return {
@@ -110,20 +110,22 @@ resolver.define('saveGitLabConnection', async ({ payload, context }) => {
     connectedAt: new Date().toISOString(),
   };
 
-  const previousToken = await kvs.getSecret(GITLAB_TOKEN_KEY);
-  await kvs.setSecret(GITLAB_TOKEN_KEY, token, {
+  const tokenKey = getGitLabTokenKey(projectKey);
+  const configKey = getGitLabConfigKey(projectKey);
+  const previousToken = await kvs.getSecret(tokenKey);
+  await kvs.setSecret(tokenKey, token, {
     ttl: { unit: 'DAYS', value: 90 },
   });
 
   try {
-    await kvs.set(GITLAB_CONFIG_KEY, config);
+    await kvs.set(configKey, config);
   } catch (error) {
     if (typeof previousToken === 'string' && previousToken.length > 0) {
-      await kvs.setSecret(GITLAB_TOKEN_KEY, previousToken, {
+      await kvs.setSecret(tokenKey, previousToken, {
         ttl: { unit: 'DAYS', value: 90 },
       });
     } else {
-      await kvs.deleteSecret(GITLAB_TOKEN_KEY);
+      await kvs.deleteSecret(tokenKey);
     }
     throw error;
   }
@@ -142,8 +144,8 @@ resolver.define('saveGitLabConnection', async ({ payload, context }) => {
 resolver.define('disconnectGitLab', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
   await requireProjectAdmin(projectKey);
-  await kvs.deleteSecret(GITLAB_TOKEN_KEY);
-  await kvs.delete(GITLAB_CONFIG_KEY);
+  await kvs.deleteSecret(getGitLabTokenKey(projectKey));
+  await kvs.delete(getGitLabConfigKey(projectKey));
   return { connected: false };
 });
 
@@ -154,8 +156,8 @@ resolver.define('syncGitLabIssueEvidence', async ({ payload, context }) => {
   await requireVisibleIssue(projectKey, issueKey);
 
   const [config, token] = await Promise.all([
-    kvs.get(GITLAB_CONFIG_KEY),
-    kvs.getSecret(GITLAB_TOKEN_KEY),
+    kvs.get(getGitLabConfigKey(projectKey)),
+    kvs.getSecret(getGitLabTokenKey(projectKey)),
   ]);
 
   if (!config || typeof token !== 'string' || token.length === 0) {
