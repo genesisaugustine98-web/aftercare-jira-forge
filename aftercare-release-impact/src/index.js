@@ -1,12 +1,13 @@
-import api, { fetch as forgeFetch } from '@forge/api';
+import api, { webTrigger } from '@forge/api';
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
-import { GitLabApiError, fetchGitLabProject } from './backend/gitlab-client.mjs';
-import { collectGitLabIssueEvidence } from './backend/gitlab-evidence-service.mjs';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { processGitLabWebhookEvent } from './backend/gitlab-webhook-service.mjs';
 
 const resolver = new Resolver();
-const getGitLabTokenKey = (projectKey) => `aftercare.gitlab.${projectKey}.access-token`;
-const getGitLabConfigKey = (projectKey) => `aftercare.gitlab.${projectKey}.project-config`;
+const getGitLabSecretKey = (projectKey) => `aftercare.gitlab.${projectKey}.webhook-secret`;
+const getGitLabConfigKey = (projectKey) => `aftercare.gitlab.${projectKey}.webhook-config`;
+const getEvidenceKey = (projectKey, issueKey) => `aftercare.evidence.${projectKey}.${issueKey}`;
 
 function getProjectKey(context, payload) {
   const projectKey = context?.extension?.project?.key || payload?.projectKey;
@@ -50,140 +51,119 @@ async function requireVisibleIssue(projectKey, issueKey) {
   }
 }
 
+function buildWebhookUrl(baseUrl, projectKey) {
+  const url = new URL(baseUrl);
+  url.searchParams.set('projectKey', projectKey);
+  return url.toString();
+}
+
+function getHeader(headers, headerName) {
+  const match = Object.entries(headers || {}).find(
+    ([name]) => name.toLowerCase() === headerName.toLowerCase(),
+  );
+  if (!match) return '';
+  const value = match[1];
+  return Array.isArray(value) ? String(value[0] || '') : String(value || '');
+}
+
+function getQueryValue(queryParameters, name) {
+  const value = queryParameters?.[name];
+  return Array.isArray(value) ? String(value[0] || '') : String(value || '');
+}
+
+function safeSecretEqual(provided, expected) {
+  if (typeof provided !== 'string' || typeof expected !== 'string'
+    || !provided || !expected) {
+    return false;
+  }
+  const providedBuffer = Buffer.from(provided, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  return providedBuffer.length === expectedBuffer.length
+    && timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
 resolver.define('getGitLabConnectionStatus', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
   const canManage = await hasProjectAdminPermission(projectKey);
 
   if (!canManage) {
-    return { connected: false, canManage: false, project: null };
+    return {
+      configured: false,
+      canManage: false,
+      project: null,
+      webhookUrl: null,
+    };
   }
 
-  const [config, token] = await Promise.all([
+  const [config, secret] = await Promise.all([
     kvs.get(getGitLabConfigKey(projectKey)),
-    kvs.getSecret(getGitLabTokenKey(projectKey)),
+    kvs.getSecret(getGitLabSecretKey(projectKey)),
   ]);
+  const baseUrl = await webTrigger.getUrl('gitlab-webhook');
 
   return {
-    connected: Boolean(config && typeof token === 'string' && token.length > 0),
+    configured: Boolean(config && typeof secret === 'string' && secret.length > 0),
     canManage: true,
     project: config || null,
+    webhookUrl: buildWebhookUrl(baseUrl, projectKey),
   };
 });
 
-resolver.define('saveGitLabConnection', async ({ payload, context }) => {
+resolver.define('generateGitLabWebhookSetup', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
   await requireProjectAdmin(projectKey);
-
-  const token = typeof payload?.token === 'string' ? payload.token.trim() : '';
-  if (token.length < 10 || /[\r\n]/.test(token)) {
-    throw new Error('Enter a valid GitLab access token with read_api access.');
-  }
 
   const projectId = Number(payload?.projectId);
   if (!Number.isSafeInteger(projectId) || projectId <= 0) {
     throw new Error('Enter the numeric GitLab project ID.');
   }
 
-  let project;
-  try {
-    project = await fetchGitLabProject(projectId, token, forgeFetch);
-  } catch (error) {
-    if (error instanceof GitLabApiError && error.status === 401) {
-      throw new Error('GitLab rejected this token. Check that it is valid and has read_api access.');
-    }
-    if (error instanceof GitLabApiError && error.status === 404) {
-      throw new Error('GitLab could not find this project or the token cannot access it.');
-    }
-    throw new Error('Aftercare could not verify the GitLab project. Check the project ID and token permissions.');
-  }
-
-  const projectUrl = new URL(project.web_url);
-  if (projectUrl.origin !== 'https://gitlab.com') {
-    throw new Error('Only GitLab.com projects are supported by this development integration.');
-  }
-
-  const config = {
-    projectId: project.id,
-    projectPath: project.path_with_namespace,
-    projectName: project.name,
-    webUrl: project.web_url,
-    connectedAt: new Date().toISOString(),
-  };
-
-  const tokenKey = getGitLabTokenKey(projectKey);
+  const baseUrl = await webTrigger.getUrl('gitlab-webhook');
+  const webhookUrl = buildWebhookUrl(baseUrl, projectKey);
+  const secret = randomBytes(32).toString('hex');
+  const secretKey = getGitLabSecretKey(projectKey);
   const configKey = getGitLabConfigKey(projectKey);
-  const previousToken = await kvs.getSecret(tokenKey);
-  await kvs.setSecret(tokenKey, token, {
+  const previousSecret = await kvs.getSecret(secretKey);
+
+  await kvs.setSecret(secretKey, secret, {
     ttl: { unit: 'DAYS', value: 90 },
   });
+
+  const config = {
+    projectId,
+    webhookUrl,
+    configuredAt: new Date().toISOString(),
+    lastEventAt: null,
+    lastEventKind: null,
+  };
 
   try {
     await kvs.set(configKey, config);
   } catch (error) {
-    if (typeof previousToken === 'string' && previousToken.length > 0) {
-      await kvs.setSecret(tokenKey, previousToken, {
+    if (typeof previousSecret === 'string' && previousSecret.length > 0) {
+      await kvs.setSecret(secretKey, previousSecret, {
         ttl: { unit: 'DAYS', value: 90 },
       });
     } else {
-      await kvs.deleteSecret(tokenKey);
+      await kvs.deleteSecret(secretKey);
     }
     throw error;
   }
 
   return {
-    connected: true,
-    project: {
-      id: config.projectId,
-      name: config.projectName,
-      path: config.projectPath,
-      webUrl: config.webUrl,
-    },
+    configured: true,
+    project: config,
+    webhookUrl,
+    secret,
   };
 });
 
 resolver.define('disconnectGitLab', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
   await requireProjectAdmin(projectKey);
-  await kvs.deleteSecret(getGitLabTokenKey(projectKey));
+  await kvs.deleteSecret(getGitLabSecretKey(projectKey));
   await kvs.delete(getGitLabConfigKey(projectKey));
-  return { connected: false };
-});
-
-resolver.define('syncGitLabIssueEvidence', async ({ payload, context }) => {
-  const projectKey = getProjectKey(context, payload);
-  await requireProjectAdmin(projectKey);
-  const issueKey = payload?.issueKey;
-  await requireVisibleIssue(projectKey, issueKey);
-
-  const [config, token] = await Promise.all([
-    kvs.get(getGitLabConfigKey(projectKey)),
-    kvs.getSecret(getGitLabTokenKey(projectKey)),
-  ]);
-
-  if (!config || typeof token !== 'string' || token.length === 0) {
-    throw new Error('GitLab is not connected to this Jira project yet.');
-  }
-
-  let snapshot;
-  try {
-    snapshot = await collectGitLabIssueEvidence({
-      issueKey,
-      projectId: config.projectId,
-      token,
-      fetchImpl: forgeFetch,
-    });
-  } catch (error) {
-    if (error instanceof GitLabApiError && error.status === 401) {
-      throw new Error('The GitLab token has expired or been revoked. Replace the token in Aftercare and try again.');
-    }
-    if (error instanceof GitLabApiError && error.status === 403) {
-      throw new Error('The GitLab token does not have read_api access to the configured project.');
-    }
-    throw error;
-  }
-
-  await kvs.set(`aftercare.evidence.${projectKey}.${issueKey}`, snapshot);
-  return snapshot;
+  return { configured: false };
 });
 
 resolver.define('getGitLabIssueEvidence', async ({ payload, context }) => {
@@ -191,7 +171,81 @@ resolver.define('getGitLabIssueEvidence', async ({ payload, context }) => {
   await requireProjectAdmin(projectKey);
   const issueKey = payload?.issueKey;
   await requireVisibleIssue(projectKey, issueKey);
-  return (await kvs.get(`aftercare.evidence.${projectKey}.${issueKey}`)) || null;
+  return (await kvs.get(getEvidenceKey(projectKey, issueKey))) || null;
 });
+
+export async function gitlabWebhook(request) {
+  try {
+    if (request?.method !== 'POST') {
+      return { outputKey: 'invalid' };
+    }
+
+    const projectKey = getQueryValue(request.queryParameters, 'projectKey');
+    if (!/^[A-Z][A-Z0-9]+$/.test(projectKey)) {
+      return { outputKey: 'invalid' };
+    }
+
+    const suppliedSecret = getHeader(request.headers, 'x-gitlab-token');
+    const [expectedSecret, config] = await Promise.all([
+      kvs.getSecret(getGitLabSecretKey(projectKey)),
+      kvs.get(getGitLabConfigKey(projectKey)),
+    ]);
+
+    if (!config || !safeSecretEqual(suppliedSecret, expectedSecret)) {
+      return { outputKey: 'unauthorized' };
+    }
+
+    const body = typeof request.body === 'string' ? request.body : '';
+    if (!body || body.length > 250_000) {
+      return { outputKey: 'invalid' };
+    }
+
+    let event;
+    try {
+      event = JSON.parse(body);
+    } catch {
+      return { outputKey: 'invalid' };
+    }
+
+    if (Number(event.project?.id) !== Number(config.projectId)) {
+      return { outputKey: 'invalid' };
+    }
+
+    const eventKind = String(
+      event.object_kind || getHeader(request.headers, 'x-gitlab-event') || 'unknown',
+    );
+    const eventUuid = getHeader(request.headers, 'x-gitlab-event-uuid');
+    const eventFingerprint = createHash('sha256')
+      .update(eventUuid || `${eventKind}:${body}`)
+      .digest('hex');
+    const eventKey = `aftercare.gitlab.${projectKey}.event.${eventFingerprint}`;
+
+    if (await kvs.get(eventKey)) {
+      return { outputKey: 'accepted' };
+    }
+
+    const result = await processGitLabWebhookEvent({
+      projectKey,
+      projectId: config.projectId,
+      event,
+      store: kvs,
+    });
+
+    await kvs.set(eventKey, true, {
+      ttl: { unit: 'DAYS', value: 7 },
+    });
+    await kvs.set(getGitLabConfigKey(projectKey), {
+      ...config,
+      lastEventAt: new Date().toISOString(),
+      lastEventKind: eventKind,
+      lastAffectedIssueCount: result.affectedIssues.length,
+    });
+
+    return { outputKey: 'accepted' };
+  } catch {
+    // Never log webhook payloads, headers, or shared secrets.
+    return { outputKey: 'error' };
+  }
+}
 
 export const handler = resolver.getDefinitions();
