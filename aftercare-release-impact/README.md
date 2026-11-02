@@ -84,8 +84,8 @@ The feature branch adds a provider-neutral evidence assessment model and a GitLa
 
 These are tested normalization and decision primitives only. Live GitLab API access, secure credential storage, webhooks, evidence persistence and a user-facing release dossier are not implemented yet. See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab adapter boundary](../docs/gitlab-evidence-adapter.md).
 
-## Live GitLab connection implementation (development)
+## GitLab webhook evidence (development)
 
-The app now contains a server-side GitLab.com read-only connection, encrypted token storage, Jira project-admin authorization, explicit issue-key matching, current-head pipeline/job/test-report collection, and revision/freshness assessment. The connection requires a Forge permission upgrade and a GitLab `read_api` token entered in the Aftercare UI before it can be used in Jira. See [the connection design and verification boundary](../docs/gitlab-forge-connection.md).
+The app uses a static Forge webtrigger to receive signed GitLab.com merge-request, pipeline and job events. It does not call the GitLab API or require a GitLab access token. A project-scoped secret is stored with Forge KVS secret storage; Jira project administrators configure and inspect evidence. The app checks explicit Jira issue references, exact merge-request head SHA and 24-hour freshness. See [the webhook setup and verification boundary](../docs/gitlab-forge-connection.md).
 
-This is not a release-readiness approval system: source diffs, validated vulnerability findings, deployment evidence, immutable decision history and production authorization remain out of scope.
+The installed Jira app still needs the new `storage:app` permission approved and a GitLab webhook configured before this feature is live. Source diffs, test-report counts, vulnerability findings, deployment evidence, immutable decision history and production authorization remain out of scope.
