@@ -245,7 +245,7 @@ test('rejects a pipeline event with an untrusted URL', async () => {
       store: makeStore(),
       now: NOW,
     }),
-    /not trusted/,
+    /does not belong to the configured HTTPS GitLab instance/,
   );
 });
 
