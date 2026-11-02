@@ -43,10 +43,9 @@ const App = () => {
     canManage: false,
     project: null,
   });
-  const [gitLabProjectId, setGitLabProjectId] = useState('');
-  const [gitLabToken, setGitLabToken] = useState('');
+  const [gitLabProjectId, setGitLabProjectId] = useState('87726693');
+  const [gitLabSetupSecret, setGitLabSetupSecret] = useState('');
   const [gitLabBusy, setGitLabBusy] = useState(false);
-  const [showGitLabTokenForm, setShowGitLabTokenForm] = useState(false);
   const [gitLabError, setGitLabError] = useState(null);
   const [gitLabMessage, setGitLabMessage] = useState(null);
   const [evidenceByIssue, setEvidenceByIssue] = useState({});
@@ -65,8 +64,14 @@ const App = () => {
     invoke('getGitLabConnectionStatus', { projectKey })
       .then((result) => {
         if (isActive) {
-          setGitLabConnection({ status: 'ready', ...result });
-          setGitLabProjectId(result.project?.projectId ? String(result.project.projectId) : '');
+          setGitLabConnection({
+            status: 'ready',
+            connected: result.configured,
+            canManage: result.canManage,
+            project: result.project,
+            webhookUrl: result.webhookUrl,
+          });
+          setGitLabProjectId(result.project?.projectId ? String(result.project.projectId) : '87726693');
         }
       })
       .catch((error) => {
@@ -92,21 +97,20 @@ const App = () => {
     setGitLabMessage(null);
 
     try {
-      const result = await invoke('saveGitLabConnection', {
+      const result = await invoke('generateGitLabWebhookSetup', {
         projectKey,
         projectId: gitLabProjectId,
-        token: gitLabToken,
       });
       setGitLabConnection({
         status: 'ready',
         connected: true,
         canManage: true,
         project: result.project,
+        webhookUrl: result.webhookUrl,
       });
-      setGitLabProjectId(String(result.project.id));
-      setShowGitLabTokenForm(false);
-      setGitLabToken('');
-      setGitLabMessage('GitLab is connected. Its access token is stored encrypted and is never shown again.');
+      setGitLabProjectId(String(result.project.projectId));
+      setGitLabSetupSecret(result.secret);
+      setGitLabMessage('Webhook details generated. Copy the secret now; it will not be shown again after this page is refreshed.');
     } catch (error) {
       setGitLabError(error instanceof Error ? error.message : 'GitLab could not be connected.');
     } finally {
@@ -127,9 +131,9 @@ const App = () => {
         canManage: true,
         project: null,
       });
-      setShowGitLabTokenForm(false);
+      setGitLabSetupSecret('');
       setEvidenceByIssue({});
-      setGitLabProjectId('');
+      setGitLabProjectId('87726693');
       setGitLabMessage('GitLab has been disconnected and its stored access token deleted.');
     } catch (error) {
       setGitLabError(error instanceof Error ? error.message : 'GitLab could not be disconnected.');
@@ -143,7 +147,7 @@ const App = () => {
     setGitLabError(null);
 
     try {
-      const snapshot = await invoke('syncGitLabIssueEvidence', { projectKey, issueKey });
+      const snapshot = await invoke('getGitLabIssueEvidence', { projectKey, issueKey });
       setEvidenceByIssue((current) => ({ ...current, [issueKey]: snapshot }));
     } catch (error) {
       setGitLabError(error instanceof Error ? error.message : 'GitLab evidence could not be retrieved.');
@@ -299,21 +303,35 @@ const App = () => {
               this project's connected GitLab evidence.
             </Text>
           </SectionMessage>
-        ) : gitLabConnection.connected && !showGitLabTokenForm ? (
-          <SectionMessage appearance="success" title="GitLab connected">
+        ) : gitLabConnection.connected ? (
+          <SectionMessage appearance="success" title="GitLab webhook configured">
             <Stack space="space.100">
               <Text>
-                {gitLabConnection.project?.projectName || gitLabConnection.project?.name}
-                {' · '}
-                {gitLabConnection.project?.projectPath || gitLabConnection.project?.path}
+                GitLab project ID: {gitLabConnection.project?.projectId}
               </Text>
               <Text>
-                Read-only GitLab.com access. The stored token expires from Aftercare
-                after 90 days; GitLab may expire it sooner.
+                Webhook URL: {gitLabConnection.webhookUrl}
+              </Text>
+              {gitLabSetupSecret ? (
+                <Text>Secret token (copy into GitLab now): {gitLabSetupSecret}</Text>
+              ) : (
+                <Text>
+                  The secret is stored securely and is not displayed again.
+                  Generate a new secret if you need to replace the GitLab webhook token.
+                </Text>
+              )}
+              <Text>
+                In GitLab, open Settings → Webhooks. Paste the URL and secret,
+                enable Merge request events, Pipeline events and Job events,
+                and leave SSL verification enabled.
+              </Text>
+              <Text>
+                Last event: {gitLabConnection.project?.lastEventAt || 'Waiting for the first webhook event'}
+                {gitLabConnection.project?.lastEventKind ? ` · ${gitLabConnection.project.lastEventKind}` : ''}
               </Text>
               <Inline>
-                <Button onClick={() => setShowGitLabTokenForm(true)} isDisabled={gitLabBusy}>
-                  Replace access token
+                <Button onClick={connectGitLab} isDisabled={gitLabBusy}>
+                  Generate / rotate secret
                 </Button>
                 <Button onClick={disconnectGitLab} isDisabled={gitLabBusy}>
                   Disconnect GitLab
@@ -322,14 +340,17 @@ const App = () => {
             </Stack>
           </SectionMessage>
         ) : (
-          <SectionMessage appearance="information" title={gitLabConnection.connected ? 'Replace GitLab access token' : 'Connect a GitLab project'}>
+          <SectionMessage appearance="information" title="Configure a GitLab webhook">
             <Stack space="space.100">
               <Text>
-                Connect one GitLab.com project using an access token with the
-                read_api scope. Use a project token where possible. Aftercare
-                stores the token in Forge's encrypted secret store, never displays
-                it again, and allows only Jira project administrators to inspect
-                the connected evidence.
+                Aftercare uses signed, inbound GitLab webhooks. It does not need
+                a GitLab access token and does not make outbound requests to GitLab.
+                Only Jira project administrators can configure or inspect evidence.
+              </Text>
+              <Text>
+                I found your active Aftercare GitLab project with ID 87726693.
+                It is prefilled below; change the ID if this Jira project should
+                receive events from another GitLab project.
               </Text>
               <Label labelFor="gitlab-project-id">GitLab numeric project ID</Label>
               <Textfield
@@ -337,31 +358,13 @@ const App = () => {
                 value={gitLabProjectId}
                 onChange={(event) => setGitLabProjectId(event.target.value)}
               />
-              <Label labelFor="gitlab-access-token">GitLab access token</Label>
-              <Textfield
-                id="gitlab-access-token"
-                type="password"
-                value={gitLabToken}
-                onChange={(event) => setGitLabToken(event.target.value)}
-              />
               <Inline>
                 <Button
                   onClick={connectGitLab}
-                  isDisabled={gitLabBusy || !gitLabProjectId.trim() || !gitLabToken.trim()}
+                  isDisabled={gitLabBusy || !gitLabProjectId.trim()}
                 >
-                  {gitLabConnection.connected ? 'Update access token' : 'Connect GitLab'}
+                  Generate webhook URL and secret
                 </Button>
-                {gitLabConnection.connected ? (
-                  <Button
-                    onClick={() => {
-                      setShowGitLabTokenForm(false);
-                      setGitLabToken('');
-                    }}
-                    isDisabled={gitLabBusy}
-                  >
-                    Cancel
-                  </Button>
-                ) : null}
               </Inline>
             </Stack>
           </SectionMessage>
@@ -424,7 +427,7 @@ const App = () => {
                           onClick={() => inspectGitLabEvidence(issue.key)}
                           isDisabled={Boolean(evidenceLoading[issue.key])}
                         >
-                          {evidenceLoading[issue.key] ? 'Inspecting GitLab…' : 'Inspect GitLab evidence'}
+                          {evidenceLoading[issue.key] ? 'Loading GitLab evidence…' : 'Load GitLab evidence'}
                         </Button>
                       </Inline>
                       {evidenceByIssue[issue.key] ? (
@@ -494,13 +497,15 @@ const App = () => {
       <SectionMessage appearance="information" title="Current assessment scope">
         <Text>
           Aftercare reads Jira project details and recent work items. When a
-          Jira project administrator connects GitLab, it can collect explicitly
-          linked merge requests, pipeline status, CI job results and test-report
-          evidence against the exact merge-request head commit. A successful
-          security_scan job is recorded only as job-execution evidence; it is not
-          a claim that vulnerability findings are clear. Aftercare does not yet
-          analyse source diffs or deployment records, change Jira data, or
-          authorize a production release.
+          Jira project administrator configures the static GitLab webhook, it
+          receives explicitly linked merge requests, pipeline status and CI job
+          results, then checks them against the exact merge-request head commit.
+          A successful security_scan job is recorded only as job-execution
+          evidence; it is not a claim that vulnerability findings are clear.
+          Events are collected from the time the webhook is enabled; historical
+          pipeline and job events are not backfilled. Aftercare does not analyse
+          source diffs or deployment records, change Jira data, or authorize a
+          production release.
         </Text>
       </SectionMessage>
     </Stack>
