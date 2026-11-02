@@ -64,7 +64,7 @@ test('paginates merge requests and reports whether the result is complete', asyn
   const urls = [];
   const result = await listGitLabMergeRequests(42, TOKEN, async (url) => {
     urls.push(url);
-    if (url.includes('page=1')) {
+    if (new URL(url).searchParams.get('page') === '1') {
       return jsonResponse([{ iid: 1 }], { headers: { 'x-next-page': '2' } });
     }
     return jsonResponse([{ iid: 2 }]);
