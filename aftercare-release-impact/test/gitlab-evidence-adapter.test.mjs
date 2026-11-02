@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeGitLabPipeline,
+  normalizeGitLabJob,
   resolveMergeRequestIssueLink,
 } from '../src/frontend/gitlab-evidence-adapter.mjs';
 import { assessEvidence, EVIDENCE_STATUS } from '../src/frontend/evidence-model.mjs';
