@@ -44,12 +44,12 @@ These states are not interchangeable. In particular, missing, skipped, stale, an
 5. Require a valid observation time; future or absent timestamps are unavailable.
 6. Apply a configurable freshness window; old evidence is stale even if the SHA matches.
 7. Preserve explicit failed, skipped, not-run, missing, unavailable, conflicting and not-applicable states.
-8. Summaries report coverage separately from outcome. No configured requirements means coverage is unknown, not complete.
+8. Summaries report coverage separately from outcome. No configured requirements means coverage and outcome are unknown, even if individual evidence records pass. A non-empty policy with no passing evidence remains needs-review.
 
-Abbreviated hashes are accepted only for prefix comparison to support provider payloads, but adapters should retain full commit IDs wherever possible.
+Only full 40-character SHA-1 or 64-character SHA-256 identifiers are accepted. Abbreviated hashes are rejected because prefix matching cannot prove exact revision identity.
 
 ## Current implementation boundary
 
-The pure JavaScript module `src/frontend/evidence-model.mjs` implements validation, revision matching, freshness assessment and conservative summaries. Its tests cover mismatched revisions, old results, missing provenance, future timestamps, explicit non-success states and incomplete coverage.
+The pure JavaScript module `src/frontend/evidence-model.mjs` implements validation, revision matching, freshness assessment and conservative summaries. Its tests cover mismatched revisions, old results, missing provenance, future timestamps, explicit non-success states, missing records without source links, abbreviated SHA rejection and unconfigured policy.
 
 This module does not yet call GitLab, collect pipelines, persist evidence, or produce a release decision. Those capabilities require the next integration and storage steps.
