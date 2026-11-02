@@ -652,3 +652,23 @@ export const gitLabWebhookEvidencePolicy = Object.freeze({
   maxIndexSize: MAX_INDEX_SIZE,
   maxJobsPerPipeline: MAX_JOBS_PER_PIPELINE,
 });
+
+/**
+ * Recalculate a stored issue's evidence against the current clock.
+ * This prevents a previously fresh snapshot from remaining green after expiry.
+ */
+export async function recomputeGitLabIssueEvidence({
+  projectKey,
+  projectId,
+  issueKey,
+  store,
+  now = Date.now(),
+}) {
+  return recomputeIssueSnapshot({
+    projectKey,
+    projectId,
+    issueKey,
+    store,
+    now,
+  });
+}
