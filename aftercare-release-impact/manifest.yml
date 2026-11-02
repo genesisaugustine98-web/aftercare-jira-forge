@@ -2,6 +2,31 @@ modules:
   function:
     - key: aftercare-resolver
       handler: index.handler
+    - key: gitlab-webhook-handler
+      handler: index.gitlabWebhook
+  webtrigger:
+    - key: gitlab-webhook
+      function: gitlab-webhook-handler
+      urlFormat: v2
+      response:
+        type: static
+        outputs:
+          - key: accepted
+            statusCode: 202
+            contentType: application/json
+            body: '{"accepted":true}'
+          - key: unauthorized
+            statusCode: 401
+            contentType: application/json
+            body: '{"error":"unauthorized"}'
+          - key: invalid
+            statusCode: 400
+            contentType: application/json
+            body: '{"error":"invalid"}'
+          - key: error
+            statusCode: 500
+            contentType: application/json
+            body: '{"error":"internal"}'
   jira:projectPage:
     - key: aftercare-release-impact-project-page
       resource: main
@@ -22,7 +47,3 @@ permissions:
   scopes:
     - read:jira-work
     - storage:app
-  external:
-    fetch:
-      backend:
-        - https://gitlab.com
