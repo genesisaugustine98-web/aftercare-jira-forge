@@ -1,8 +1,14 @@
 import api, { webTrigger } from '@forge/api';
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { processGitLabWebhookEvent } from './backend/gitlab-webhook-service.mjs';
+import {
+  fingerprintGitLabEvent,
+  getHeader,
+  getQueryValue,
+  safeSecretEqual,
+} from './backend/gitlab-webhook-security.mjs';
 
 const resolver = new Resolver();
 const getGitLabSecretKey = (projectKey) => `aftercare.gitlab.${projectKey}.webhook-secret`;
@@ -57,30 +63,6 @@ function buildWebhookUrl(baseUrl, projectKey) {
   return url.toString();
 }
 
-function getHeader(headers, headerName) {
-  const match = Object.entries(headers || {}).find(
-    ([name]) => name.toLowerCase() === headerName.toLowerCase(),
-  );
-  if (!match) return '';
-  const value = match[1];
-  return Array.isArray(value) ? String(value[0] || '') : String(value || '');
-}
-
-function getQueryValue(queryParameters, name) {
-  const value = queryParameters?.[name];
-  return Array.isArray(value) ? String(value[0] || '') : String(value || '');
-}
-
-function safeSecretEqual(provided, expected) {
-  if (typeof provided !== 'string' || typeof expected !== 'string'
-    || !provided || !expected) {
-    return false;
-  }
-  const providedBuffer = Buffer.from(provided, 'utf8');
-  const expectedBuffer = Buffer.from(expected, 'utf8');
-  return providedBuffer.length === expectedBuffer.length
-    && timingSafeEqual(providedBuffer, expectedBuffer);
-}
 
 resolver.define('getGitLabConnectionStatus', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
@@ -215,9 +197,7 @@ export async function gitlabWebhook(request) {
       event.object_kind || getHeader(request.headers, 'x-gitlab-event') || 'unknown',
     );
     const eventUuid = getHeader(request.headers, 'x-gitlab-event-uuid');
-    const eventFingerprint = createHash('sha256')
-      .update(eventUuid || `${eventKind}:${body}`)
-      .digest('hex');
+    const eventFingerprint = fingerprintGitLabEvent(eventKind, body, eventUuid);
     const eventKey = `aftercare.gitlab.${projectKey}.event.${eventFingerprint}`;
 
     if (await kvs.get(eventKey)) {
