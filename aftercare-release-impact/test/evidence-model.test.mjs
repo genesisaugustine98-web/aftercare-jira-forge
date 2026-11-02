@@ -27,8 +27,10 @@ function record(overrides = {}) {
   };
 }
 
-test('normalizes valid SHA identifiers and rejects branch names', () => {
+test('accepts only full immutable SHA-1 or SHA-256 identifiers', () => {
   assert.equal(normalizeCommitSha(CURRENT_SHA.toUpperCase()), CURRENT_SHA);
+  assert.equal(normalizeCommitSha('c'.repeat(64)), 'c'.repeat(64));
+  assert.equal(normalizeCommitSha(CURRENT_SHA.slice(0, 12)), null);
   assert.equal(normalizeCommitSha('feature/release'), null);
   assert.equal(normalizeCommitSha(''), null);
 });
@@ -147,12 +149,30 @@ test('does not claim complete coverage when no requirements are configured', () 
   assert.equal(summary.outcome, 'unknown');
 });
 
-test('allows abbreviated hashes only when one is a prefix of the other', () => {
+test('does not accept an abbreviated commit hash as revision proof', () => {
   const result = assessEvidence({
     evidence: record({ commitSha: CURRENT_SHA.slice(0, 12) }),
     expectedCommitSha: CURRENT_SHA,
     now: NOW,
   });
 
-  assert.equal(result.status, EVIDENCE_STATUS.PASSED);
+  assert.equal(result.status, EVIDENCE_STATUS.UNAVAILABLE);
+  assert.equal(result.freshness, EVIDENCE_FRESHNESS.UNKNOWN);
+});
+
+test('preserves a missing-evidence record without inventing a source URL', () => {
+  const missing = record({ status: EVIDENCE_STATUS.MISSING, sourceUrl: null, commitSha: null });
+  const validation = validateEvidenceRecord(missing);
+  const result = assessEvidence({ evidence: missing, expectedCommitSha: CURRENT_SHA, now: NOW });
+
+  assert.equal(validation.valid, true);
+  assert.equal(result.status, EVIDENCE_STATUS.MISSING);
+});
+
+test('does not return a green outcome when checks pass but no policy is configured', () => {
+  const passed = assessEvidence({ evidence: record(), expectedCommitSha: CURRENT_SHA, now: NOW });
+  const summary = summarizeEvidence([passed], []);
+
+  assert.equal(summary.coverage, 'unknown');
+  assert.equal(summary.outcome, 'unknown');
 });
