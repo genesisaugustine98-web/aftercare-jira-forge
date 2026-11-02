@@ -60,4 +60,4 @@ The app stores the latest evidence snapshot per Jira issue. This is not yet an i
 
 ## Verification boundary
 
-Automated tests cover webhook project validation, explicit issue-key linking, ambiguous associations, event ordering, deduplication at the handler boundary, exact commit matching, stale evidence, missing CI jobs, invalid source URLs and safe outcomes. Live end-to-end verification still requires the Forge app upgrade, a GitLab webhook configured with the generated URL and secret, and new GitLab events after setup.
+Automated tests cover webhook project validation, explicit issue-key linking, ambiguous associations, event ordering, secret comparison, event fingerprinting for retries, exact commit matching, stale evidence, missing CI jobs, invalid source URLs and safe outcomes. Live end-to-end verification still requires the Forge app upgrade, a GitLab webhook configured with the generated URL and secret, and new GitLab events after setup.
