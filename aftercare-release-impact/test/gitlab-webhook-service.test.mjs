@@ -38,16 +38,15 @@ function pipelineEvent(overrides = {}) {
 function jobEvent(id, name, overrides = {}) {
   return {
     object_kind: 'build',
-    project: { id: PROJECT_ID },
+    project: { id: PROJECT_ID, web_url: 'https://gitlab.com/acme/payments' },
     build_id: id,
     build_status: 'success',
     build_name: name,
     build_stage: 'verify',
-    build_url: `https://gitlab.com/acme/payments/-/jobs/${id}`,
     build_created_at: FRESH,
     build_started_at: FRESH,
     build_finished_at: FRESH,
-    commit: { id: SHA },
+    commit: { sha: SHA },
     pipeline_id: 10,
     ...overrides,
   };
@@ -302,4 +301,41 @@ test('keeps running jobs as not-run evidence', async () => {
 
   assert.equal(result.snapshots[0].status, 'needs_review');
   assert.equal(result.snapshots[0].summary.counts.not_run, 3);
+});
+
+test('pipeline-linked MR summary is not treated as a verified head until an MR event arrives', async () => {
+  const store = makeStore();
+  const event = {
+    ...pipelineEvent(),
+    merge_request: {
+      id: 1001,
+      iid: 1,
+      title: 'VAN-1: validate payment change',
+      source_branch: BRANCH,
+      target_branch: 'main',
+      url: 'https://gitlab.com/acme/payments/-/merge_requests/1',
+      state: 'opened',
+    },
+  };
+  const pipelineResult = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event,
+    store,
+    now: NOW,
+  });
+
+  assert.equal(pipelineResult.snapshots[0].status, 'unavailable');
+  assert.match(pipelineResult.snapshots[0].message, /head SHA has not been confirmed/);
+
+  const mergeRequestResult = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+
+  assert.equal(mergeRequestResult.snapshots[0].status, 'needs_review');
+  assert.equal(mergeRequestResult.snapshots[0].expectedCommitSha, SHA);
 });
