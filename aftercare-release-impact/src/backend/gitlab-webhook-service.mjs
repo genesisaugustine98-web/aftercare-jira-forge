@@ -190,7 +190,7 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
   const pipelineRecords = [];
   for (const id of pipelineIds) {
     const pipeline = await store.get(pipelineKey(projectKey, id));
-    if (pipeline && pipeline.ref === mr.sourceBranch) {
+    if (pipeline && (pipeline.mergeRequestIid === String(mr.iid) || pipeline.ref === mr.sourceBranch)) {
       pipelineRecords.push(pipeline);
     }
   }
@@ -437,6 +437,7 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
     ...normalized.evidence,
     pipelineId: String(pipelineId),
     ref: pipelineInput.ref,
+    mergeRequestIid: event.merge_request?.iid == null ? null : String(event.merge_request.iid),
     updatedAt: pipelineInput.updated_at || pipelineInput.created_at,
   };
   await store.set(pipelineKey(projectKey, pipelineId), record);
@@ -548,7 +549,7 @@ async function handleJob({ projectKey, projectId, event, store, now }) {
     const mrIids = await getIndex(store, key(projectKey, 'mr-index'));
     for (const iid of mrIids) {
       const mr = await store.get(mrKey(projectKey, iid));
-      if (mr?.sourceBranch === pipeline.ref) {
+      if (mr && (String(mr.iid) === pipeline.mergeRequestIid || mr.sourceBranch === pipeline.ref)) {
         for (const issueKey of issueKeysForMergeRequest(mr)) affectedIssues.add(issueKey);
       }
     }
