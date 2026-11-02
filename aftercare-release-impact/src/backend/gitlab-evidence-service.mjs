@@ -237,6 +237,7 @@ export async function collectGitLabIssueEvidence({
           reason: normalizedPipeline.error,
         });
         assessments.push(assess(unavailablePipeline, expectedCommitSha, now, maxAgeMs));
+        pipeline = null;
       }
     } catch (error) {
       const missing = error instanceof GitLabApiError && error.status === 404;
