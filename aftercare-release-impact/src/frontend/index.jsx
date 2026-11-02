@@ -116,7 +116,7 @@ const App = () => {
     } finally {
       setGitLabBusy(false);
     }
-  }, [projectKey, gitLabProjectId, gitLabToken]);
+  }, [projectKey, gitLabProjectId]);
 
   const disconnectGitLab = useCallback(async () => {
     setGitLabBusy(true);
@@ -134,7 +134,7 @@ const App = () => {
       setGitLabSetupSecret('');
       setEvidenceByIssue({});
       setGitLabProjectId('87726693');
-      setGitLabMessage('GitLab has been disconnected and its stored access token deleted.');
+      setGitLabMessage('GitLab webhook credentials have been deleted. Remove the old webhook from GitLab project settings to stop its retries.');
     } catch (error) {
       setGitLabError(error instanceof Error ? error.message : 'GitLab could not be disconnected.');
     } finally {
@@ -430,6 +430,13 @@ const App = () => {
                           {evidenceLoading[issue.key] ? 'Loading GitLab evidence…' : 'Load GitLab evidence'}
                         </Button>
                       </Inline>
+                      {evidenceByIssue[issue.key] === null ? (
+                        <Text>
+                          No webhook evidence has been received for this Jira issue yet.
+                          A merge request must explicitly include this issue key, and
+                          GitLab must send merge request, pipeline and job events.
+                        </Text>
+                      ) : null}
                       {evidenceByIssue[issue.key] ? (
                         <Stack space="space.050">
                           <Inline space="space.100" alignBlock="center">
