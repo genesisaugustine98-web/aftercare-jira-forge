@@ -26,6 +26,6 @@ export function safeSecretEqual(provided, expected) {
 }
 
 export function fingerprintGitLabEvent(eventKind, body, eventUuid = '') {
-  const source = eventUuid || `${eventKind}:${body}`;
+  const source = eventUuid ? `${eventKind}:${eventUuid}` : `${eventKind}:${body}`;
   return createHash('sha256').update(source).digest('hex');
 }
