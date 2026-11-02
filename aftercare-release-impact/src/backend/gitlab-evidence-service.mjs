@@ -32,6 +32,16 @@ const JOB_KIND_BY_NAME = Object.freeze({
   release_evidence: 'release_evidence_execution',
 });
 
+function isTrustedGitLabUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.origin === 'https://gitlab.com'
+      && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
 function createFallbackEvidence({
   id,
   kind,
@@ -155,6 +165,19 @@ export async function collectGitLabIssueEvidence({
     token,
     fetchImpl,
   );
+  if (!isTrustedGitLabUrl(mergeRequest.web_url)
+    || String(mergeRequest.project_id) !== String(projectId)
+    || String(mergeRequest.iid) !== String(listedMergeRequest.iid)) {
+    return {
+      status: 'unavailable',
+      issueKey,
+      message: 'The GitLab merge request identity or source URL could not be verified.',
+      summary: summarize([], requiredKinds),
+      assessments: [],
+      fetchedAt: new Date(now).toISOString(),
+    };
+  }
+
   const detailLink = resolveMergeRequestIssueLink(mergeRequest);
 
   if (detailLink.status !== 'linked' || detailLink.issueKey !== issueKey) {
@@ -173,9 +196,25 @@ export async function collectGitLabIssueEvidence({
     };
   }
 
-  const expectedCommitSha = normalizeCommitSha(
-    mergeRequest.diff_refs?.head_sha || mergeRequest.sha,
-  );
+  const rawHeadSha = mergeRequest.diff_refs?.head_sha ?? mergeRequest.sha;
+  const expectedCommitSha = normalizeCommitSha(rawHeadSha);
+  const mergeRequestSha = normalizeCommitSha(mergeRequest.sha);
+
+  if (expectedCommitSha && mergeRequestSha && expectedCommitSha !== mergeRequestSha) {
+    return {
+      status: 'conflicting',
+      issueKey,
+      message: 'GitLab returned conflicting merge-request head commit identifiers.',
+      mergeRequest: {
+        iid: mergeRequest.iid,
+        title: mergeRequest.title,
+        webUrl: mergeRequest.web_url,
+      },
+      summary: summarize([], requiredKinds),
+      assessments: [],
+      fetchedAt: new Date(now).toISOString(),
+    };
+  }
 
   if (!expectedCommitSha) {
     return {
@@ -216,6 +255,7 @@ export async function collectGitLabIssueEvidence({
       const normalizedPipeline = normalizeGitLabPipeline(pipeline, {
         gitlabBaseUrl: 'https://gitlab.com',
         expectedProjectId: projectId,
+        expectedPipelineId: headPipelineId,
       });
 
       if (normalizedPipeline.valid) {
@@ -272,6 +312,7 @@ export async function collectGitLabIssueEvidence({
         const normalizedJob = normalizeGitLabJob(job, {
           gitlabBaseUrl: 'https://gitlab.com',
           expectedProjectId: projectId,
+          expectedPipelineId: pipeline.id,
           kind,
         });
 
