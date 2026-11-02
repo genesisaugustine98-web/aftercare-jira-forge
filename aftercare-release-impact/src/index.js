@@ -74,8 +74,8 @@ resolver.define('saveGitLabConnection', async ({ payload, context }) => {
   const projectKey = getProjectKey(context, payload);
   await requireProjectAdmin(projectKey);
 
-  const token = payload?.token;
-  if (typeof token !== 'string' || token.trim().length < 10 || /[\r\n]/.test(token)) {
+  const token = typeof payload?.token === 'string' ? payload.token.trim() : '';
+  if (token.length < 10 || /[\r\n]/.test(token)) {
     throw new Error('Enter a valid GitLab access token with read_api access.');
   }
 
