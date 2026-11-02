@@ -26,12 +26,12 @@ export const EVIDENCE_FRESHNESS = Object.freeze({
 });
 
 const ALLOWED_STATUSES = new Set(Object.values(EVIDENCE_STATUS));
-const SHA_PATTERN = /^[a-f0-9]{7,64}$/i;
+const SHA_PATTERN = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
 
 /**
  * Normalize commit identifiers without accepting branch names or arbitrary
- * strings. Short hashes are allowed because some providers return abbreviated
- * identifiers, but callers should prefer full immutable commit IDs.
+ * strings. Only full SHA-1 or SHA-256 identifiers are accepted so a prefix
+ * collision can never be mistaken for proof of an exact revision.
  */
 export function normalizeCommitSha(value) {
   if (typeof value !== 'string') {
@@ -78,8 +78,14 @@ export function validateEvidenceRecord(record) {
     errors.push('Evidence record requires a source name.');
   }
 
-  if (typeof record.sourceUrl !== 'string' || !isSafeHttpsUrl(record.sourceUrl)) {
-    errors.push('Evidence record requires an HTTPS source URL.');
+  const sourceLinkOptional = [EVIDENCE_STATUS.MISSING, EVIDENCE_STATUS.NOT_RUN,
+    EVIDENCE_STATUS.UNAVAILABLE].includes(record.status);
+  if (record.sourceUrl == null || record.sourceUrl === '') {
+    if (!sourceLinkOptional) {
+      errors.push('Evidence record requires an HTTPS source URL.');
+    }
+  } else if (typeof record.sourceUrl !== 'string' || !isSafeHttpsUrl(record.sourceUrl)) {
+    errors.push('Evidence source URL must use HTTPS.');
   }
 
   if (record.commitSha != null && !normalizeCommitSha(record.commitSha)) {
@@ -151,9 +157,8 @@ export function assessEvidence({
       'The source did not provide a commit SHA, so this result cannot prove the current revision.');
   }
 
-  // Prefix matching is intentionally conservative: abbreviated hashes only
-  // match when one is a prefix of the other. Providers should send full SHAs.
-  if (!(expectedSha.startsWith(evidenceSha) || evidenceSha.startsWith(expectedSha))) {
+  // Exact equality is required. Prefix matches are not proof of identity.
+  if (expectedSha !== evidenceSha) {
     return assessment(evidence, EVIDENCE_STATUS.STALE, EVIDENCE_FRESHNESS.STALE,
       'Evidence belongs to a different commit than the revision currently under review.');
   }
@@ -241,9 +246,11 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
     counts,
     missingKinds,
     coverage: requiredKinds.length === 0 ? 'unknown' : (missingKinds.length === 0 ? 'present' : 'incomplete'),
-    outcome: total === 0 || requiredKinds.length === 0 && total === 0
+    outcome: requiredKinds.length === 0 || total === 0
       ? 'unknown'
-      : (hasBlockingEvidence ? 'needs_review' : 'evidence_current'),
+      : (hasBlockingEvidence || counts[EVIDENCE_STATUS.PASSED] === 0
+        ? 'needs_review'
+        : 'evidence_current'),
     hasBlockingEvidence,
   };
 }
