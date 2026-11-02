@@ -430,7 +430,7 @@ const App = () => {
                       {evidenceByIssue[issue.key] ? (
                         <Stack space="space.050">
                           <Inline space="space.100" alignBlock="center">
-                            <Text as="strong">Evidence state</Text>
+                            <Text>Evidence state</Text>
                             <Lozenge
                               appearance={evidenceByIssue[issue.key].status === 'evidence_current'
                                 ? 'success'
