@@ -13,7 +13,10 @@ import {
 const REQUIRED_KINDS = Object.freeze([
   'pipeline',
   'test_suite_execution',
+  'test_report',
   'security_scan_execution',
+  'security_report',
+  'release_gate',
 ]);
 const MAX_INDEX_SIZE = 500;
 const MAX_JOBS_PER_PIPELINE = 200;
@@ -306,6 +309,18 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       }
     }
 
+    const customEvidence = await store.get(
+      key(projectKey, `pipeline-custom-evidence.${selectedPipeline.pipelineId}`),
+    ) || [];
+    for (const evidence of customEvidence) {
+      assessments.push(assessEvidence({
+        evidence,
+        expectedCommitSha,
+        now,
+        maxAgeMs: MAX_AGE_MS,
+      }));
+    }
+
     if (await store.get(key(projectKey, `pipeline-jobs-incomplete.${selectedPipeline.pipelineId}`))) {
       assessments.push(assessEvidence({
         evidence: makeMissingEvidence({
@@ -529,6 +544,144 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
   return { affectedIssues: [...affectedIssues], snapshots };
 }
 
+async function handleCustomEvidence({ projectKey, projectId, event, store, now }) {
+  const pipeline = event.pipeline || {};
+  const pipelineId = pipeline.id;
+  const commitSha = normalizeCommitSha(pipeline.sha);
+  const pipelineUrl = pipeline.web_url || pipeline.url;
+  const ref = pipeline.ref;
+  const generatedAt = event.generated_at;
+
+  if (!Number.isSafeInteger(Number(pipelineId)) || Number(pipelineId) <= 0
+    || !commitSha || !isTrustedGitLabUrl(pipelineUrl)
+    || typeof ref !== 'string' || !ref.trim()) {
+    throw new TypeError('Custom evidence event is missing valid pipeline provenance.');
+  }
+
+  const observedAt = new Date(generatedAt);
+  if (!generatedAt || Number.isNaN(observedAt.getTime()) || observedAt.getTime() > now) {
+    throw new TypeError('Custom evidence event has an invalid generation timestamp.');
+  }
+
+  const test = event.test_report || {};
+  const tests = Number(test.tests);
+  const failures = Number(test.failures);
+  const errors = Number(test.errors);
+  const skipped = Number(test.skipped);
+  if (![tests, failures, errors, skipped].every(Number.isSafeInteger)
+    || tests < 0 || failures < 0 || errors < 0 || skipped < 0
+    || failures + errors + skipped > tests) {
+    throw new TypeError('Custom test-report counts are invalid.');
+  }
+
+  let testStatus = EVIDENCE_STATUS.PASSED;
+  if (tests === 0) testStatus = EVIDENCE_STATUS.MISSING;
+  else if (failures + errors > 0) testStatus = EVIDENCE_STATUS.FAILED;
+  else if (skipped === tests) testStatus = EVIDENCE_STATUS.SKIPPED;
+
+  const security = event.security_report || {};
+  const securityTotal = Number(security.total);
+  const blockingFindings = Number(security.blocking_findings);
+  const bySeverity = security.by_severity || {};
+  const severityCounts = ['critical', 'high', 'medium', 'low'].map((severity) => (
+    Number(bySeverity[severity])
+  ));
+  if (![securityTotal, blockingFindings, ...severityCounts].every(Number.isSafeInteger)
+    || securityTotal < 0 || blockingFindings < 0
+    || severityCounts.some((count) => count < 0)) {
+    throw new TypeError('Custom security-report summary is invalid.');
+  }
+
+  let securityStatus = EVIDENCE_STATUS.UNAVAILABLE;
+  if (security.decision === 'HOLD' || blockingFindings > 0) {
+    securityStatus = EVIDENCE_STATUS.FAILED;
+  } else if (security.decision === 'READY_FOR_HUMAN_REVIEW') {
+    securityStatus = EVIDENCE_STATUS.PASSED;
+  }
+
+  const release = event.release_evidence || {};
+  const releaseStatus = release.decision === 'READY_FOR_HUMAN_REVIEW'
+    && release.human_approval_required === true
+    && release.production_release_approved === false
+    ? EVIDENCE_STATUS.PASSED
+    : EVIDENCE_STATUS.CONFLICTING;
+
+  const evidence = [
+    {
+      id: `gitlab:test-report:${projectId}:${pipelineId}`,
+      kind: 'test_report',
+      source: 'GitLab CI evidence publisher',
+      sourceUrl: pipelineUrl,
+      commitSha,
+      pipelineId: String(pipelineId),
+      observedAt: observedAt.toISOString(),
+      status: testStatus,
+      details: { tests, failures, errors, skipped },
+      reason: `JUnit summary: ${tests} tests, ${failures} failures, ${errors} errors, ${skipped} skipped.`,
+    },
+    {
+      id: `gitlab:security-report:${projectId}:${pipelineId}`,
+      kind: 'security_report',
+      source: 'Aftercare Gatekeeper',
+      sourceUrl: pipelineUrl,
+      commitSha,
+      pipelineId: String(pipelineId),
+      observedAt: observedAt.toISOString(),
+      status: securityStatus,
+      details: {
+        total: securityTotal,
+        critical: severityCounts[0],
+        high: severityCounts[1],
+        medium: severityCounts[2],
+        low: severityCounts[3],
+        blockingFindings,
+        decision: String(security.decision || 'unknown'),
+      },
+      reason: `Gatekeeper summary: ${securityTotal} findings, ${blockingFindings} blocking findings; decision ${security.decision || 'unknown'}.`,
+    },
+    {
+      id: `gitlab:release-gate:${projectId}:${pipelineId}`,
+      kind: 'release_gate',
+      source: 'Aftercare release evidence',
+      sourceUrl: pipelineUrl,
+      commitSha,
+      pipelineId: String(pipelineId),
+      observedAt: observedAt.toISOString(),
+      status: releaseStatus,
+      details: {
+        decision: String(release.decision || 'unknown'),
+        humanApprovalRequired: release.human_approval_required === true,
+        productionReleaseApproved: release.production_release_approved === true,
+      },
+      reason: 'Release evidence must require human approval and must not claim that production was approved.',
+    },
+  ];
+
+  await store.set(key(projectKey, `pipeline-custom-evidence.${pipelineId}`), evidence, {
+    ttl: { unit: 'DAYS', value: 30 },
+  });
+
+  const pipelineRecord = await store.get(pipelineKey(projectKey, pipelineId));
+  const affectedIssues = new Set();
+  if (pipelineRecord) {
+    const mrIids = await getIndex(store, key(projectKey, 'mr-index'));
+    for (const iid of mrIids) {
+      const mr = await store.get(mrKey(projectKey, iid));
+      if (mr && (String(mr.iid) === pipelineRecord.mergeRequestIid || mr.sourceBranch === pipelineRecord.ref)) {
+        for (const issueKey of issueKeysForMergeRequest(mr)) affectedIssues.add(issueKey);
+      }
+    }
+  }
+
+  const snapshots = [];
+  for (const issueKey of affectedIssues) {
+    snapshots.push(await recomputeIssueSnapshot({
+      projectKey, projectId, issueKey, store, now,
+    }));
+  }
+  return { affectedIssues: [...affectedIssues], snapshots };
+}
+
 async function handleJob({ projectKey, projectId, event, store, now }) {
   const pipelineId = event.pipeline_id;
   const buildId = event.build_id;
@@ -636,6 +789,8 @@ export async function processGitLabWebhookEvent({
       return { eventKind: 'pipeline', ...(await handlePipeline(common)) };
     case 'build':
       return { eventKind: 'build', ...(await handleJob(common)) };
+    case 'aftercare_evidence':
+      return { eventKind: 'aftercare_evidence', ...(await handleCustomEvidence(common)) };
     default:
       return {
         eventKind: String(event.object_kind || 'unknown'),
