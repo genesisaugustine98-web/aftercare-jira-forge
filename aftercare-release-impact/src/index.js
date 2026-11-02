@@ -13,7 +13,6 @@ import {
 const resolver = new Resolver();
 const getGitLabSecretKey = (projectKey) => `aftercare.gitlab.${projectKey}.webhook-secret`;
 const getGitLabConfigKey = (projectKey) => `aftercare.gitlab.${projectKey}.webhook-config`;
-const getEvidenceKey = (projectKey, issueKey) => `aftercare.evidence.${projectKey}.${issueKey}`;
 
 function getProjectKey(context, payload) {
   const projectKey = context?.extension?.project?.key || payload?.projectKey;
