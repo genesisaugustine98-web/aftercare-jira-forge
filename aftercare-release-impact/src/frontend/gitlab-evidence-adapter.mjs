@@ -87,7 +87,7 @@ export function normalizeGitLabPipeline(
   };
 }
 
-const JIRA_ISSUE_KEY = /\\b[A-Z][A-Z0-9]+-\\d+\\b/g;
+const JIRA_ISSUE_KEY = /\b[A-Z][A-Z0-9]+-\d+\b/g;
 
 /**
  * Resolve only explicit Jira issue keys written on a merge request. A single
