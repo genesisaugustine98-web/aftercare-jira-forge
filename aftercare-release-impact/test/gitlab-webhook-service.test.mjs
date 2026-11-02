@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processGitLabWebhookEvent } from '../src/backend/gitlab-webhook-service.mjs';
+import { processGitLabWebhookEvent, recomputeGitLabIssueEvidence } from '../src/backend/gitlab-webhook-service.mjs';
 
 const PROJECT_ID = 42;
 const SHA = 'a'.repeat(40);
@@ -338,4 +338,27 @@ test('pipeline-linked MR summary is not treated as a verified head until an MR e
 
   assert.equal(mergeRequestResult.snapshots[0].status, 'needs_review');
   assert.equal(mergeRequestResult.snapshots[0].expectedCommitSha, SHA);
+});
+
+test('recomputes freshness when an old snapshot is read after its 24-hour window', async () => {
+  const store = makeStore();
+  await seedCurrentEvidence(store);
+  await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+
+  const refreshed = await recomputeGitLabIssueEvidence({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    issueKey: 'VAN-1',
+    store,
+    now: NOW + (25 * 60 * 60 * 1000),
+  });
+
+  assert.equal(refreshed.status, 'needs_review');
+  assert.equal(refreshed.summary.counts.stale, 3);
 });
