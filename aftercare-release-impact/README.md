@@ -84,6 +84,6 @@ The app uses a static Forge webtrigger to receive signed GitLab.com merge-reques
 
 Evidence is linked only through one explicit Jira issue key and assessed against the exact merge-request head SHA with a 24-hour freshness window. The receiver can also accept an aggregate CI evidence event containing JUnit counts, Gatekeeper severity totals and the supervised release-gate decision. It never needs source code or individual finding details.
 
-The app branch still requires the `storage:app` permission upgrade and GitLab webhook setup before the feature is live. The optional publisher change is proposed separately in [GitLab merge request !2](https://gitlab.com/genesisaugustine98-web-group/genesisaugustine98-web-project/-/merge_requests/2). Historical events are not backfilled. Source-diff analysis, deployment evidence, immutable decision history and production authorization remain out of scope.
+The app branch still requires the `storage:app` permission upgrade and GitLab webhook setup before the feature is live. The optional aggregate CI publisher has been merged into the GitLab project's main branch. It remains inactive until the two protected CI/CD variables are configured. Historical events are not backfilled. Source-diff analysis, deployment evidence, immutable decision history and production authorization remain out of scope.
 
 See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab webhook setup and verification boundary](../docs/gitlab-forge-connection.md).
