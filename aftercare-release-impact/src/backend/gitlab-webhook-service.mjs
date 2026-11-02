@@ -37,7 +37,7 @@ async function getIndex(store, indexKey) {
   return Array.isArray(value) ? value : [];
 }
 
-async function updateIndex(store, indexKey, value, add, limit = MAX_INDEX_SIZE) {
+async function updateIndex(store, indexKey, value, add, limit = MAX_INDEX_SIZE, rollover = false) {
   const current = await getIndex(store, indexKey);
   const normalized = String(value);
   const next = add
@@ -45,7 +45,8 @@ async function updateIndex(store, indexKey, value, add, limit = MAX_INDEX_SIZE) 
     : current.filter((item) => String(item) !== normalized);
 
   if (next.length > limit) {
-    return false;
+    if (!rollover) return false;
+    next.splice(0, next.length - limit);
   }
 
   await store.set(indexKey, next);
@@ -126,11 +127,22 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       summary: summarizeEvidence([], REQUIRED_KINDS),
       fetchedAt: new Date(now).toISOString(),
     };
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+    ttl: { unit: 'DAYS', value: 180 },
+  });
     return snapshot;
   }
 
-  const mrIids = await getIndex(store, issueMrIndexKey(projectKey, issueKey));
+  const issueIndexKey = issueMrIndexKey(projectKey, issueKey);
+  const indexedMrIids = await getIndex(store, issueIndexKey);
+  const activeMrIids = [];
+  for (const iid of indexedMrIids) {
+    if (await store.get(mrKey(projectKey, iid))) activeMrIids.push(String(iid));
+  }
+  if (activeMrIids.length !== indexedMrIids.length) {
+    await store.set(issueIndexKey, activeMrIids);
+  }
+  const mrIids = activeMrIids;
   if (mrIids.length === 0) {
     const snapshot = {
       status: 'missing',
@@ -385,8 +397,19 @@ async function handleMergeRequest({ projectKey, projectId, event, store, now, he
     candidates,
   };
 
-  await store.set(mrKey(projectKey, iid), record);
-  const mrIndexComplete = await updateIndex(store, key(projectKey, 'mr-index'), iid, true);
+  await store.set(mrKey(projectKey, iid), record, {
+    ttl: { unit: 'DAYS', value: 180 },
+  });
+  const mrIndexKey = key(projectKey, 'mr-index');
+  const indexedMriids = await getIndex(store, mrIndexKey);
+  const activeMriids = [];
+  for (const existingIid of indexedMriids) {
+    if (await store.get(mrKey(projectKey, existingIid))) activeMriids.push(String(existingIid));
+  }
+  if (activeMriids.length !== indexedMriids.length) {
+    await store.set(mrIndexKey, activeMriids);
+  }
+  const mrIndexComplete = await updateIndex(store, mrIndexKey, iid, true);
   if (!mrIndexComplete) {
     await store.set(key(projectKey, 'mr-index-incomplete'), true);
   }
@@ -440,7 +463,9 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
     mergeRequestIid: event.merge_request?.iid == null ? null : String(event.merge_request.iid),
     updatedAt: pipelineInput.updated_at || pipelineInput.created_at,
   };
-  await store.set(pipelineKey(projectKey, pipelineId), record);
+  await store.set(pipelineKey(projectKey, pipelineId), record, {
+    ttl: { unit: 'DAYS', value: 30 },
+  });
 
   // A pipeline event can include a linked MR summary. It may establish a
   // candidate Jira association, but it cannot independently confirm the MR
@@ -471,7 +496,7 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
     }
   }
 
-  const indexComplete = await updateIndex(store, key(projectKey, 'pipeline-index'), pipelineId, true);
+  const indexComplete = await updateIndex(store, key(projectKey, 'pipeline-index'), pipelineId, true, MAX_INDEX_SIZE, true);
   if (!indexComplete) await store.set(key(projectKey, 'pipeline-index-incomplete'), true);
 
   const mrIids = await getIndex(store, key(projectKey, 'mr-index'));
@@ -530,7 +555,9 @@ async function handleJob({ projectKey, projectId, event, store, now }) {
     name: jobInput.name,
     stage: jobInput.stage,
   };
-  await store.set(jobKey(projectKey, event.build_id), record);
+  await store.set(jobKey(projectKey, event.build_id), record, {
+    ttl: { unit: 'DAYS', value: 30 },
+  });
 
   const indexComplete = await updateIndex(
     store,
