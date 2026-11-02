@@ -222,9 +222,9 @@ export async function gitlabWebhook(request) {
     });
 
     return { outputKey: 'accepted' };
-  } catch {
+  } catch (error) {
     // Never log webhook payloads, headers, or shared secrets.
-    return { outputKey: 'error' };
+    return { outputKey: error instanceof TypeError ? 'invalid' : 'error' };
   }
 }
 
