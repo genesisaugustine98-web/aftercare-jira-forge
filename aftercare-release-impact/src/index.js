@@ -164,12 +164,23 @@ resolver.define('syncGitLabIssueEvidence', async ({ payload, context }) => {
     throw new Error('GitLab is not connected to this Jira project yet.');
   }
 
-  const snapshot = await collectGitLabIssueEvidence({
-    issueKey,
-    projectId: config.projectId,
-    token,
-    fetchImpl: forgeFetch,
-  });
+  let snapshot;
+  try {
+    snapshot = await collectGitLabIssueEvidence({
+      issueKey,
+      projectId: config.projectId,
+      token,
+      fetchImpl: forgeFetch,
+    });
+  } catch (error) {
+    if (error instanceof GitLabApiError && error.status === 401) {
+      throw new Error('The GitLab token has expired or been revoked. Replace the token in Aftercare and try again.');
+    }
+    if (error instanceof GitLabApiError && error.status === 403) {
+      throw new Error('The GitLab token does not have read_api access to the configured project.');
+    }
+    throw error;
+  }
 
   await kvs.set(`aftercare.evidence.${projectKey}.${issueKey}`, snapshot);
   return snapshot;
