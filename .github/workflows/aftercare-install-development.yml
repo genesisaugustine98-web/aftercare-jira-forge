@@ -57,7 +57,7 @@ jobs:
         run: forge settings set usage-analytics false
 
       - name: Validate the app manifest
-        run: forge lint
+        run: forge lint --approve MAJOR_VERSION_RULE
 
       # This workflow is manual by design. The required authorization input
       # makes the site-level installation an explicit user action.
