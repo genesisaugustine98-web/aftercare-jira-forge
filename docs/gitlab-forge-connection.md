@@ -55,7 +55,7 @@ The required evidence kinds are:
 
 The `aftercare_evidence` event can be sent by a GitLab CI publisher after the existing test, security and release-evidence jobs complete. It sends only aggregate JUnit counts, Gatekeeper severity totals and the release-gate flags—not source code or individual finding evidence. The publisher uses the same webhook URL and secret as masked GitLab CI/CD variables `AFTERCARE_WEBHOOK_URL` and `AFTERCARE_WEBHOOK_TOKEN`.
 
-A successful `security_scan` job proves only that the configured job completed successfully. The Gatekeeper summary adds severity counts and its configured HOLD/review decision, but it does **not** prove that the application is vulnerability-free. A separate GitLab CI publisher change is required to send the detailed aggregate evidence; without it, Aftercare keeps the relevant evidence kinds missing and the result remains `needs_review`.
+A successful `security_scan` job proves only that the configured job completed successfully. The Gatekeeper summary adds severity counts and its configured HOLD/review decision, but it does **not** prove that the application is vulnerability-free. The GitLab CI publisher is now merged into the project's main branch. It sends the aggregate evidence only after `AFTERCARE_WEBHOOK_URL` and `AFTERCARE_WEBHOOK_TOKEN` are configured as protected CI/CD variables; until then, Aftercare keeps the relevant evidence kinds missing and the result remains `needs_review`.
 
 Events are collected from the time the webhook is enabled. Historical merge requests, pipelines and jobs are not backfilled. The GitLab webhook event and index limits are bounded; if an index overflows, Aftercare marks the evidence incomplete rather than returning a green result.
 
