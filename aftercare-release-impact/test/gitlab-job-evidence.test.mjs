@@ -6,10 +6,10 @@ import {
 } from '../src/frontend/gitlab-evidence-adapter.mjs';
 import { assessEvidence, EVIDENCE_STATUS } from '../src/frontend/evidence-model.mjs';
 
-const SHA = '7adc2312bb977e7236241a0dbb0732c5d8563b9e';
-const PROJECT_ID = 87775544;
+const SHA = 'a'.repeat(40);
+const PROJECT_ID = 4242;
 const PIPELINE = {
-  id: 2971624271,
+  id: 9001,
   project_id: PROJECT_ID,
   sha: SHA,
   status: 'success',
@@ -18,12 +18,12 @@ const PIPELINE = {
   web_url: 'https://gitlab.com/acme/showcase/-/pipelines/2971624271',
 };
 const JOB = {
-  id: 17346084101,
+  id: 12345,
   project_id: PROJECT_ID,
   status: 'success',
   stage: 'verify',
   name: 'unit_tests',
-  web_url: 'https://gitlab.com/acme/showcase/-/jobs/17346084101',
+  web_url: 'https://gitlab.com/acme/showcase/-/jobs/12345',
   created_at: '2026-10-21T11:09:13.611Z',
   started_at: '2026-10-21T11:09:13.987Z',
   finished_at: '2026-10-21T11:09:27.690Z',
@@ -152,4 +152,22 @@ test('rejects malformed test report aggregates', () => {
   }, PIPELINE, OPTIONS);
 
   assert.equal(result.valid, false);
+});
+
+test('marks a job from an earlier commit stale for the reviewed revision', () => {
+  const result = normalizeGitLabJob({
+    ...JOB,
+    commit: { id: 'b'.repeat(40) },
+  }, {
+    ...OPTIONS,
+    kind: 'test_suite_execution',
+  });
+  const assessment = assessEvidence({
+    evidence: result.evidence,
+    expectedCommitSha: SHA,
+    now: Date.parse('2026-10-21T12:00:00.000Z'),
+  });
+
+  assert.equal(result.valid, true);
+  assert.equal(assessment.status, EVIDENCE_STATUS.STALE);
 });
