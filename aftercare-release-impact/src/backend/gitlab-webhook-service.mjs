@@ -588,8 +588,10 @@ async function handleCustomEvidence({ projectKey, projectId, event, store, now }
   ));
   if (![securityTotal, blockingFindings, ...severityCounts].every(Number.isSafeInteger)
     || securityTotal < 0 || blockingFindings < 0
-    || severityCounts.some((count) => count < 0)) {
-    throw new TypeError('Custom security-report summary is invalid.');
+    || severityCounts.some((count) => count < 0)
+    || securityTotal !== severityCounts.reduce((sum, count) => sum + count, 0)
+    || blockingFindings !== severityCounts[0] + severityCounts[1]) {
+    throw new TypeError('Custom security-report summary is invalid or internally inconsistent.');
   }
 
   let securityStatus = EVIDENCE_STATUS.UNAVAILABLE;
