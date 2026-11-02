@@ -22,7 +22,7 @@ const PIPELINE_STATUS = Object.freeze({
  */
 export function normalizeGitLabPipeline(
   pipeline,
-  { gitlabBaseUrl, expectedProjectId } = {},
+  { gitlabBaseUrl, expectedProjectId, expectedPipelineId } = {},
 ) {
   if (!pipeline || typeof pipeline !== 'object' || Array.isArray(pipeline)) {
     return { valid: false, error: 'GitLab pipeline response must be an object.' };
@@ -57,6 +57,10 @@ export function normalizeGitLabPipeline(
 
   if (pipeline.id == null || !String(pipeline.id).trim()) {
     return { valid: false, error: 'GitLab pipeline is missing its stable ID.' };
+  }
+
+  if (expectedPipelineId != null && String(pipeline.id) !== String(expectedPipelineId)) {
+    return { valid: false, error: 'GitLab pipeline ID does not match the merge request head pipeline.' };
   }
 
   const status = PIPELINE_STATUS[pipeline.status];
@@ -151,7 +155,7 @@ const JOB_STATUS = Object.freeze({
  */
 export function normalizeGitLabJob(
   job,
-  { gitlabBaseUrl, expectedProjectId, kind } = {},
+  { gitlabBaseUrl, expectedProjectId, expectedPipelineId, kind } = {},
 ) {
   if (!job || typeof job !== 'object' || Array.isArray(job)) {
     return { valid: false, error: 'GitLab job response must be an object.' };
@@ -194,6 +198,10 @@ export function normalizeGitLabJob(
 
   if (job.pipeline?.id == null) {
     return { valid: false, error: 'GitLab job is not linked to a pipeline ID.' };
+  }
+
+  if (expectedPipelineId != null && String(job.pipeline.id) !== String(expectedPipelineId)) {
+    return { valid: false, error: 'GitLab job belongs to a different pipeline.' };
   }
 
   const status = JOB_STATUS[job.status];

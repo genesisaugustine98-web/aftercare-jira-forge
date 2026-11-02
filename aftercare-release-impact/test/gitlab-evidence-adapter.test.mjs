@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizeGitLabPipeline,
+  normalizeGitLabJob,
   resolveMergeRequestIssueLink,
 } from '../src/frontend/gitlab-evidence-adapter.mjs';
 import { assessEvidence, EVIDENCE_STATUS } from '../src/frontend/evidence-model.mjs';
@@ -130,4 +131,33 @@ test('marks multiple Jira issue keys as conflicting instead of choosing one', ()
   assert.equal(result.status, 'conflicting');
   assert.deepEqual(result.candidates, ['VAN-1', 'VAN-2']);
   assert.equal(result.issueKey, null);
+});
+
+test('rejects a pipeline ID that differs from the merge request head pipeline', () => {
+  const result = normalizeGitLabPipeline(PIPELINE, {
+    ...OPTIONS,
+    expectedPipelineId: 123456,
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.error, /does not match the merge request head pipeline/);
+});
+
+test('rejects a job that belongs to a different pipeline', () => {
+  const result = normalizeGitLabJob({
+    id: 99,
+    project_id: OPTIONS.expectedProjectId,
+    status: 'success',
+    web_url: 'https://gitlab.com/acme/payments/-/jobs/99',
+    created_at: '2026-11-02T07:00:00.000Z',
+    commit: { id: 'a'.repeat(40) },
+    pipeline: { id: 123456 },
+  }, {
+    ...OPTIONS,
+    expectedPipelineId: 10,
+    kind: 'ci_job',
+  });
+
+  assert.equal(result.valid, false);
+  assert.match(result.error, /different pipeline/);
 });

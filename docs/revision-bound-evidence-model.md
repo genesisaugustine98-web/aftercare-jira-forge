@@ -45,7 +45,7 @@ These states are not interchangeable. In particular, missing, skipped, stale, an
 5. Require a valid observation time; future or absent timestamps are unavailable.
 6. Apply a configurable freshness window; old evidence is stale even if the SHA matches.
 7. Preserve explicit failed, cancelled, skipped, not-run, missing, unavailable, conflicting and not-applicable states.
-8. Summaries report coverage separately from outcome. No configured requirements means coverage and outcome are unknown, even if individual evidence records pass. A non-empty policy with no passing evidence remains needs-review.
+8. Summaries report coverage separately from outcome. No configured requirements means coverage and outcome are unknown, even if individual evidence records pass. When requirements are configured but no evidence exists, the outcome is needs-review. A non-empty policy with no passing evidence remains needs-review.
 
 Only full 40-character SHA-1 or 64-character SHA-256 identifiers are accepted. Abbreviated hashes are rejected because prefix matching cannot prove exact revision identity.
 

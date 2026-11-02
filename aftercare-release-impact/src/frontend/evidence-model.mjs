@@ -196,6 +196,7 @@ function assessment(evidence, status, freshness, reason) {
     commitSha: normalizeCommitSha(evidence?.commitSha),
     pipelineId: evidence?.pipelineId == null ? null : String(evidence.pipelineId),
     observedAt: evidence?.observedAt ?? null,
+    details: evidence?.details && typeof evidence.details === 'object' ? evidence.details : null,
     status,
     freshness,
     reason,
@@ -231,7 +232,15 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
     }
   }
 
-  const presentKinds = new Set((assessments || []).map((item) => item?.kind).filter(Boolean));
+  const nonCoverageStatuses = new Set([
+    EVIDENCE_STATUS.MISSING,
+    EVIDENCE_STATUS.NOT_RUN,
+    EVIDENCE_STATUS.UNAVAILABLE,
+  ]);
+  const presentKinds = new Set((assessments || [])
+    .filter((item) => item && !nonCoverageStatuses.has(item.status))
+    .map((item) => item.kind)
+    .filter(Boolean));
   const missingKinds = [...new Set(requiredKinds)].filter((kind) => !presentKinds.has(kind));
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const hasBlockingEvidence = [
@@ -250,7 +259,7 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
     counts,
     missingKinds,
     coverage: requiredKinds.length === 0 ? 'unknown' : (missingKinds.length === 0 ? 'present' : 'incomplete'),
-    outcome: requiredKinds.length === 0 || total === 0
+    outcome: requiredKinds.length === 0
       ? 'unknown'
       : (hasBlockingEvidence || counts[EVIDENCE_STATUS.PASSED] === 0
         ? 'needs_review'

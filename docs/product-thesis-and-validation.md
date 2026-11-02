@@ -135,3 +135,12 @@ Do not build a broad “AI release manager” first. AI may summarize evidence o
 The present Forge app is a read-only project context foundation: it retrieves project metadata and up to eight recently updated Jira work items visible to the current user. It has no GitLab connection, release/fix-version scope, evidence dossier, security scanner integration, deployment records, policy engine, immutable decision record, or live Jira-site acceptance test yet.
 
 This is intentionally a small, permission-minimal first deployment. It is **not** the differentiated product MVP described above and must not be marketed as release readiness or production risk analysis.
+
+
+## November 2026 implementation update
+
+The revision-bound evidence foundation and signed GitLab webhook receiver are implemented in the development branch. Aftercare uses a static Forge webtrigger and receives GitLab merge-request, pipeline and job events. It does not call the GitLab API, require a GitLab access token, or declare external egress. A project-scoped random secret is stored in Forge KVS secret storage, and only Jira project administrators can configure or inspect evidence.
+
+The app links only explicit Jira issue references and compares pipeline/job records with the exact merge-request head SHA using a 24-hour freshness window. Its complete evidence policy requires pipeline status, test-job execution, JUnit test totals, security-job execution, Gatekeeper severity summary and a supervised release-gate record before returning `evidence_current`. The app distinguishes job execution from scanner findings and shows severity counts; it does not claim the project is vulnerability-free. Historical webhook events are not backfilled, and the current snapshot is not an immutable audit record.
+
+The app branch still requires approval of the new `storage:app` permission and configuration of the GitLab webhook before the feature is live. The optional CI publisher that sends aggregate JUnit, Gatekeeper and release-gate data has been merged into the GitLab project's main branch. It remains inactive until `AFTERCARE_WEBHOOK_URL` and `AFTERCARE_WEBHOOK_TOKEN` are configured as protected CI/CD variables. Because the receiver is a static webtrigger and there is no external egress, the implementation is designed to preserve Runs on Atlassian eligibility; the Forge eligibility check must confirm the deployed result. Source-diff analysis, deployment evidence, immutable decision history and production authorization remain future work.
