@@ -24,7 +24,7 @@ async function requestJson(path, token, fetchImpl) {
     throw new TypeError('A fetch implementation is required.');
   }
 
-  const url = new URL(path, GITLAB_API_BASE);
+  const url = new URL(`${GITLAB_API_BASE}${path}`);
   if (url.origin !== 'https://gitlab.com' || !url.pathname.startsWith('/api/v4/')) {
     throw new TypeError('GitLab API request URL is outside the configured API origin.');
   }
