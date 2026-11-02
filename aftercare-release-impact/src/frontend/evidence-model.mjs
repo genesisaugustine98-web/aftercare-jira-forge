@@ -10,6 +10,7 @@
 export const EVIDENCE_STATUS = Object.freeze({
   PASSED: 'passed',
   FAILED: 'failed',
+  CANCELLED: 'cancelled',
   SKIPPED: 'skipped',
   NOT_RUN: 'not_run',
   MISSING: 'missing',
@@ -146,7 +147,8 @@ export function assessEvidence({
     || evidence.status === EVIDENCE_STATUS.SKIPPED
     || evidence.status === EVIDENCE_STATUS.UNAVAILABLE
     || evidence.status === EVIDENCE_STATUS.CONFLICTING
-    || evidence.status === EVIDENCE_STATUS.FAILED) {
+    || evidence.status === EVIDENCE_STATUS.FAILED
+    || evidence.status === EVIDENCE_STATUS.CANCELLED) {
     return assessment(evidence, evidence.status, EVIDENCE_FRESHNESS.UNKNOWN,
       evidence.reason || defaultReason(evidence.status));
   }
@@ -203,6 +205,7 @@ function assessment(evidence, status, freshness, reason) {
 function defaultReason(status) {
   const reasons = {
     [EVIDENCE_STATUS.FAILED]: 'The source reports that this check failed.',
+    [EVIDENCE_STATUS.CANCELLED]: 'The source reports that this check was cancelled before a successful result.',
     [EVIDENCE_STATUS.SKIPPED]: 'The source reports that this check was skipped.',
     [EVIDENCE_STATUS.NOT_RUN]: 'This check has not run.',
     [EVIDENCE_STATUS.MISSING]: 'No evidence was supplied for this requirement.',
@@ -233,6 +236,7 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const hasBlockingEvidence = [
     EVIDENCE_STATUS.FAILED,
+    EVIDENCE_STATUS.CANCELLED,
     EVIDENCE_STATUS.MISSING,
     EVIDENCE_STATUS.STALE,
     EVIDENCE_STATUS.UNAVAILABLE,
