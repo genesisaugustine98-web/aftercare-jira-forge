@@ -152,7 +152,9 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       summary: summarizeEvidence([], REQUIRED_KINDS),
       fetchedAt: new Date(now).toISOString(),
     };
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
     return snapshot;
   }
 
@@ -163,14 +165,18 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       if (mr) candidates.push({ iid: mr.iid, title: mr.title, webUrl: mr.webUrl });
     }
     const snapshot = buildConflictSnapshot(issueKey, candidates, now);
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
     return snapshot;
   }
 
   const mr = await store.get(mrKey(projectKey, mrIids[0]));
   if (!mr || mr.linkStatus === 'conflicting') {
     const snapshot = buildConflictSnapshot(issueKey, mr?.candidates || [], now);
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
     return snapshot;
   }
 
@@ -183,7 +189,9 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       summary: summarizeEvidence([], REQUIRED_KINDS),
       fetchedAt: new Date(now).toISOString(),
     };
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
     return snapshot;
   }
 
@@ -194,7 +202,9 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
       'The current merge-request head SHA has not been confirmed by a merge-request event.',
       now,
     );
-    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+    await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
     return snapshot;
   }
 
@@ -345,7 +355,9 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
     ],
   };
 
-  await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
+  await store.set(key(projectKey, `evidence.${issueKey}`), snapshot, {
+      ttl: { unit: 'DAYS', value: 180 },
+    });
   return snapshot;
 }
 
