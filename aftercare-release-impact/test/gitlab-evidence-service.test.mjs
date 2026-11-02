@@ -232,3 +232,56 @@ test('refuses a conclusion when merge request pagination is incomplete', async (
   assert.equal(result.status, 'incomplete');
   assert.equal(result.summary.outcome, 'needs_review');
 });
+
+test('rejects a merge request URL outside the configured GitLab origin', async () => {
+  const fixtures = baseFixtures();
+  fixtures.detail = {
+    ...fixtures.detail,
+    web_url: 'https://attacker.example/merge_requests/1',
+  };
+  const result = await collectGitLabIssueEvidence({
+    issueKey: 'VAN-1',
+    projectId: PROJECT_ID,
+    token: 'test-token',
+    fetchImpl: makeFetch(fixtures),
+    now: NOW,
+  });
+
+  assert.equal(result.status, 'unavailable');
+  assert.match(result.message, /identity or source URL/);
+});
+
+test('rejects conflicting merge-request head SHA fields', async () => {
+  const fixtures = baseFixtures();
+  fixtures.detail = {
+    ...fixtures.detail,
+    sha: 'b'.repeat(40),
+    diff_refs: { head_sha: SHA },
+  };
+  const result = await collectGitLabIssueEvidence({
+    issueKey: 'VAN-1',
+    projectId: PROJECT_ID,
+    token: 'test-token',
+    fetchImpl: makeFetch(fixtures),
+    now: NOW,
+  });
+
+  assert.equal(result.status, 'conflicting');
+  assert.match(result.message, /conflicting merge-request head commit/);
+});
+
+test('does not consume a pipeline whose ID differs from the MR head pipeline', async () => {
+  const fixtures = baseFixtures();
+  fixtures.pipeline = pipeline({ id: 99 });
+  const result = await collectGitLabIssueEvidence({
+    issueKey: 'VAN-1',
+    projectId: PROJECT_ID,
+    token: 'test-token',
+    fetchImpl: makeFetch(fixtures),
+    now: NOW,
+  });
+
+  assert.equal(result.status, 'needs_review');
+  assert.equal(result.pipeline, null);
+  assert.equal(result.summary.missingKinds.includes('pipeline'), true);
+});
