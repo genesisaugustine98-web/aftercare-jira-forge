@@ -80,6 +80,6 @@ The current dashboard uses UI Kit and the Jira Bridge API directly. A backend re
 
 ## Evidence foundation (in development)
 
-The feature branch adds a provider-neutral evidence assessment model and a GitLab pipeline response adapter. The model requires full commit identifiers, separates freshness from result status, and refuses to report a green outcome when no evidence policy is configured. The GitLab adapter validates the configured instance and project, preserves pending/failed/cancelled/skipped states, and links a merge request to Jira only when one explicit issue key is present.
+The feature branch adds a provider-neutral evidence assessment model and a GitLab pipeline response adapter. The model requires full commit identifiers, separates freshness from result status, and refuses to report a green outcome when no evidence policy is configured. The GitLab adapter validates the configured instance and project, preserves pending/failed/cancelled/skipped states, normalizes CI jobs and aggregate test reports separately, and links a merge request to Jira only when one explicit issue key is present.
 
 These are tested normalization and decision primitives only. Live GitLab API access, secure credential storage, webhooks, evidence persistence and a user-facing release dossier are not implemented yet. See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab adapter boundary](../docs/gitlab-evidence-adapter.md).
