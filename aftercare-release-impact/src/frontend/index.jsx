@@ -446,9 +446,25 @@ const App = () => {
                               GitLab MR !{evidenceByIssue[issue.key].mergeRequest.iid}: {evidenceByIssue[issue.key].mergeRequest.title}
                             </Link>
                           ) : null}
+                          {evidenceByIssue[issue.key].pipeline?.webUrl ? (
+                            <Link href={evidenceByIssue[issue.key].pipeline.webUrl}>
+                              Pipeline #{evidenceByIssue[issue.key].pipeline.id}: {evidenceByIssue[issue.key].pipeline.status}
+                            </Link>
+                          ) : null}
                           {evidenceByIssue[issue.key].expectedCommitSha ? (
                             <Text>Reviewed commit: {evidenceByIssue[issue.key].expectedCommitSha}</Text>
                           ) : null}
+                          {evidenceByIssue[issue.key].summary?.missingKinds?.length ? (
+                            <Text>
+                              Missing required evidence: {evidenceByIssue[issue.key].summary.missingKinds.join(', ')}
+                            </Text>
+                          ) : null}
+                          {evidenceByIssue[issue.key].assessments?.slice(0, 8).map((assessment) => (
+                            <Text key={assessment.id}>
+                              {assessment.kind}: {assessment.status}
+                              {assessment.freshness ? ` · ${assessment.freshness}` : ''}
+                            </Text>
+                          ))}
                           {evidenceByIssue[issue.key].summary ? (
                             <Text>
                               {evidenceByIssue[issue.key].summary.counts.passed} passed
