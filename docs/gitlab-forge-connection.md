@@ -37,7 +37,7 @@ The app stores the latest evidence snapshot per Jira issue. This is not yet an i
 
 ## Forge permission and eligibility trade-off
 
-This connection adds the `storage:app` scope and backend egress to `https://gitlab.com`. Existing installations must approve the new permissions through a Forge app upgrade before the feature can run. External egress may affect eligibility for Runs on Atlassian; the deployment workflow must report the actual Forge eligibility result rather than assuming it remains eligible.
+This connection adds the `storage:app` scope and backend egress to `https://gitlab.com`. Existing installations must approve the new permissions through a Forge app upgrade before the feature can run. The repository's manually triggered `.github/workflows/aftercare-upgrade-development.yml` workflow performs the developer-approved major deployment and development-site installation upgrade; the normal main-branch deployment is held when the manifest changes. External egress may affect eligibility for Runs on Atlassian; the deployment workflow must report the actual Forge eligibility result rather than assuming it remains eligible.
 
 ## Verification boundary
 
