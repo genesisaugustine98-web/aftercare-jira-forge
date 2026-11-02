@@ -146,7 +146,7 @@ test('rejects a pipeline ID that differs from the merge request head pipeline', 
 test('rejects a job that belongs to a different pipeline', () => {
   const result = normalizeGitLabJob({
     id: 99,
-    project_id: PROJECT_ID,
+    project_id: OPTIONS.expectedProjectId,
     status: 'success',
     web_url: 'https://gitlab.com/acme/payments/-/jobs/99',
     created_at: '2026-11-02T07:00:00.000Z',
