@@ -362,3 +362,164 @@ test('recomputes freshness when an old snapshot is read after its 24-hour window
   assert.equal(refreshed.status, 'needs_review');
   assert.equal(refreshed.summary.counts.stale, 3);
 });
+
+function customEvidenceEvent(overrides = {}) {
+  return {
+    object_kind: 'aftercare_evidence',
+    project: { id: PROJECT_ID },
+    generated_at: FRESH,
+    pipeline: {
+      id: 10,
+      sha: SHA,
+      ref: BRANCH,
+      web_url: 'https://gitlab.com/acme/payments/-/pipelines/10',
+    },
+    test_report: {
+      tests: 11,
+      failures: 0,
+      errors: 0,
+      skipped: 0,
+    },
+    security_report: {
+      total: 2,
+      by_severity: { critical: 0, high: 0, medium: 1, low: 1 },
+      blocking_findings: 0,
+      decision: 'READY_FOR_HUMAN_REVIEW',
+    },
+    release_evidence: {
+      decision: 'READY_FOR_HUMAN_REVIEW',
+      human_approval_required: true,
+      production_release_approved: false,
+    },
+    ...overrides,
+  };
+}
+
+test('joins CI-published test, security and release summaries to the exact pipeline revision', async () => {
+  const store = makeStore();
+  await seedCurrentEvidence(store);
+  await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: customEvidenceEvent(),
+    store,
+    now: NOW,
+  });
+
+  const snapshot = result.snapshots[0];
+  assert.equal(snapshot.status, 'evidence_current');
+  assert.deepEqual(snapshot.summary.missingKinds, []);
+  assert.equal(snapshot.assessments.some((item) => item.kind === 'test_report'), true);
+  assert.equal(snapshot.assessments.some((item) => item.kind === 'security_report'), true);
+  assert.equal(snapshot.assessments.some((item) => item.kind === 'release_gate'), true);
+  const security = snapshot.assessments.find((item) => item.kind === 'security_report');
+  assert.equal(security.details.blockingFindings, 0);
+  assert.equal(security.details.medium, 1);
+});
+
+test('blocks the evidence summary when Gatekeeper reports a HOLD', async () => {
+  const store = makeStore();
+  await seedCurrentEvidence(store);
+  await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+  const event = customEvidenceEvent({
+    security_report: {
+      total: 1,
+      by_severity: { critical: 0, high: 1, medium: 0, low: 0 },
+      blocking_findings: 1,
+      decision: 'HOLD',
+    },
+  });
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event,
+    store,
+    now: NOW,
+  });
+
+  assert.equal(result.snapshots[0].status, 'needs_review');
+  assert.equal(result.snapshots[0].summary.counts.failed, 1);
+});
+
+test('blocks the evidence summary when the JUnit report contains failures', async () => {
+  const store = makeStore();
+  await seedCurrentEvidence(store);
+  await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+  const event = customEvidenceEvent({
+    test_report: { tests: 11, failures: 1, errors: 0, skipped: 0 },
+  });
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event,
+    store,
+    now: NOW,
+  });
+
+  assert.equal(result.snapshots[0].status, 'needs_review');
+  assert.equal(result.snapshots[0].assessments.find((item) => item.kind === 'test_report').status, 'failed');
+});
+
+test('marks CI-published report evidence stale when it belongs to another commit', async () => {
+  const store = makeStore();
+  await seedCurrentEvidence(store);
+  await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: mergeRequestEvent(),
+    store,
+    now: NOW,
+  });
+  const event = customEvidenceEvent({
+    pipeline: {
+      id: 10,
+      sha: OLD_SHA,
+      ref: BRANCH,
+      web_url: 'https://gitlab.com/acme/payments/-/pipelines/10',
+    },
+  });
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event,
+    store,
+    now: NOW,
+  });
+
+  assert.equal(result.snapshots[0].status, 'needs_review');
+  assert.equal(result.snapshots[0].assessments.filter((item) => item.status === 'stale').length, 3);
+});
+
+test('rejects malformed CI-published report counts', async () => {
+  await assert.rejects(
+    processGitLabWebhookEvent({
+      projectKey: 'VAN',
+      projectId: PROJECT_ID,
+      event: customEvidenceEvent({
+        test_report: { tests: 2, failures: 2, errors: 2, skipped: 0 },
+      }),
+      store: makeStore(),
+      now: NOW,
+    }),
+    /test-report counts are invalid/,
+  );
+});
