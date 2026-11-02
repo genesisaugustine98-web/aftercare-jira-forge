@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       authorization:
-        description: "Confirm: deploy and upgrade Aftercare on agkoodaga.atlassian.net with storage:app and GitLab.com backend access."
+        description: "Confirm: deploy and upgrade Aftercare on agkoodaga.atlassian.net with storage:app and the static GitLab webhook receiver."
         required: true
         type: choice
         options:
