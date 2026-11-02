@@ -75,7 +75,7 @@ jobs:
         id: manifest-change
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          if git diff --quiet HEAD^ HEAD -- aftercare-release-impact/manifest.yml; then
+          if git diff --quiet HEAD^ HEAD -- manifest.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
