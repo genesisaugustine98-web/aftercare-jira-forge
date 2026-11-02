@@ -177,3 +177,12 @@ test('does not return a green outcome when checks pass but no policy is configur
   assert.equal(summary.coverage, 'unknown');
   assert.equal(summary.outcome, 'unknown');
 });
+
+test('returns needs-review when configured evidence is entirely absent', () => {
+  const summary = summarizeEvidence([], ['pipeline', 'test_suite']);
+
+  assert.equal(summary.coverage, 'incomplete');
+  assert.deepEqual(summary.missingKinds, ['pipeline', 'test_suite']);
+  assert.equal(summary.hasBlockingEvidence, true);
+  assert.equal(summary.outcome, 'needs_review');
+});
