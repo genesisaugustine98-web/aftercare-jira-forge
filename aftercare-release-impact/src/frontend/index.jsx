@@ -91,6 +91,28 @@ const App = () => {
     };
   }, [projectKey]);
 
+  const refreshGitLabStatus = useCallback(async () => {
+    setGitLabBusy(true);
+    setGitLabError(null);
+    try {
+      const result = await invoke('getGitLabConnectionStatus', { projectKey });
+      setGitLabConnection({
+        status: 'ready',
+        connected: result.configured,
+        canManage: result.canManage,
+        project: result.project,
+        webhookUrl: result.webhookUrl,
+      });
+      if (result.project?.projectId) {
+        setGitLabProjectId(String(result.project.projectId));
+      }
+    } catch (error) {
+      setGitLabError(error instanceof Error ? error.message : 'Webhook status could not be refreshed.');
+    } finally {
+      setGitLabBusy(false);
+    }
+  }, [projectKey]);
+
   const connectGitLab = useCallback(async () => {
     setGitLabBusy(true);
     setGitLabError(null);
@@ -304,7 +326,7 @@ const App = () => {
             </Text>
           </SectionMessage>
         ) : gitLabConnection.connected ? (
-          <SectionMessage appearance="success" title="GitLab webhook configured">
+          <SectionMessage appearance="success" title="GitLab webhook endpoint ready">
             <Stack space="space.100">
               <Text>
                 GitLab project ID: {gitLabConnection.project?.projectId}
@@ -330,6 +352,9 @@ const App = () => {
                 {gitLabConnection.project?.lastEventKind ? ` · ${gitLabConnection.project.lastEventKind}` : ''}
               </Text>
               <Inline>
+                <Button onClick={refreshGitLabStatus} isDisabled={gitLabBusy}>
+                  Refresh webhook status
+                </Button>
                 <Button onClick={connectGitLab} isDisabled={gitLabBusy}>
                   Generate / rotate secret
                 </Button>
