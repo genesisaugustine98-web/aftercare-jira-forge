@@ -8,7 +8,7 @@
 - A Jira project administrator supplies the numeric GitLab project ID and a GitLab access token with the `read_api` scope.
 - Aftercare validates the token by reading the selected project from GitLab before saving anything.
 - The token is stored with Forge KVS `kvs.setSecret`, encrypted and inaccessible through ordinary KVS queries. It expires from Aftercare storage after 90 days; GitLab may expire it earlier.
-- The normal project configuration stores only the GitLab project ID, name, namespace path, URL and connection timestamp.
+- The normal project configuration stores only the GitLab project ID, name, namespace path, URL and connection timestamp. Both the encrypted token key and evidence snapshot keys are namespaced per Jira project, so one Jira project's connection cannot silently replace another project's connection.
 - Only Jira project administrators can configure, disconnect, refresh or inspect the connected GitLab evidence.
 - The app sends authenticated requests only to `https://gitlab.com`. GitLab self-managed instances are not supported by this first connection.
 - Disconnecting deletes the stored token and project configuration.
