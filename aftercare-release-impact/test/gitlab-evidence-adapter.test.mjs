@@ -4,7 +4,7 @@ import {
   normalizeGitLabPipeline,
   resolveMergeRequestIssueLink,
 } from '../src/frontend/gitlab-evidence-adapter.mjs';
-import { EVIDENCE_STATUS } from '../src/frontend/evidence-model.mjs';
+import { assessEvidence, EVIDENCE_STATUS } from '../src/frontend/evidence-model.mjs';
 
 const PIPELINE = {
   id: 901,
@@ -91,6 +91,12 @@ test('keeps absent commit SHA explicit so assessment cannot claim a pass', () =>
 
   assert.equal(result.valid, true);
   assert.equal(result.evidence.commitSha, null);
+  const assessment = assessEvidence({
+    evidence: result.evidence,
+    expectedCommitSha: PIPELINE.sha,
+    now: Date.parse('2026-11-02T08:00:00.000Z'),
+  });
+  assert.equal(assessment.status, EVIDENCE_STATUS.UNAVAILABLE);
 });
 
 test('links a merge request only when it names one explicit Jira issue key', () => {
