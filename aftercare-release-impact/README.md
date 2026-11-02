@@ -78,14 +78,12 @@ package-lock.json
 
 The current dashboard uses UI Kit and the Jira Bridge API directly. A backend resolver is not needed for this read-only stage. Backend processing, secure provider credentials and Forge storage can be introduced when the integration and evidence-history features are designed.
 
-## Evidence foundation (in development)
+## Revision-bound GitLab evidence (development)
 
-The feature branch adds a provider-neutral evidence assessment model and a GitLab pipeline response adapter. The model requires full commit identifiers, separates freshness from result status, and refuses to report a green outcome when no evidence policy is configured. The GitLab adapter validates the configured instance and project, preserves pending/failed/cancelled/skipped states, normalizes CI jobs and aggregate test reports separately, and links a merge request to Jira only when one explicit issue key is present.
+The app uses a static Forge webtrigger to receive signed GitLab.com merge-request, pipeline and job events. It makes no outbound GitLab API calls and requires no GitLab access token. The webhook secret is project-scoped, stored with Forge KVS secret storage, and manageable only by Jira project administrators.
 
-These are tested normalization and decision primitives only. Live GitLab API access, secure credential storage, webhooks, evidence persistence and a user-facing release dossier are not implemented yet. See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab adapter boundary](../docs/gitlab-evidence-adapter.md).
+Evidence is linked only through one explicit Jira issue key and assessed against the exact merge-request head SHA with a 24-hour freshness window. The receiver can also accept an aggregate CI evidence event containing JUnit counts, Gatekeeper severity totals and the supervised release-gate decision. It never needs source code or individual finding details.
 
-## GitLab webhook evidence (development)
+The app branch still requires the `storage:app` permission upgrade and GitLab webhook setup before the feature is live. The optional publisher change is proposed separately in [GitLab merge request !2](https://gitlab.com/genesisaugustine98-web-group/genesisaugustine98-web-project/-/merge_requests/2). Historical events are not backfilled. Source-diff analysis, deployment evidence, immutable decision history and production authorization remain out of scope.
 
-The app uses a static Forge webtrigger to receive signed GitLab.com merge-request, pipeline and job events. It does not call the GitLab API or require a GitLab access token. A project-scoped secret is stored with Forge KVS secret storage; Jira project administrators configure and inspect evidence. The app checks explicit Jira issue references, exact merge-request head SHA and 24-hour freshness. See [the webhook setup and verification boundary](../docs/gitlab-forge-connection.md).
-
-The installed Jira app still needs the new `storage:app` permission approved and a GitLab webhook configured before this feature is live. Source diffs, test-report counts, vulnerability findings, deployment evidence, immutable decision history and production authorization remain out of scope.
+See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab webhook setup and verification boundary](../docs/gitlab-forge-connection.md).
