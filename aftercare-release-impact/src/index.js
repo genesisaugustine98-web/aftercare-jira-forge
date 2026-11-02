@@ -2,7 +2,7 @@ import api, { webTrigger } from '@forge/api';
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
 import { randomBytes } from 'node:crypto';
-import { processGitLabWebhookEvent } from './backend/gitlab-webhook-service.mjs';
+import { processGitLabWebhookEvent, recomputeGitLabIssueEvidence } from './backend/gitlab-webhook-service.mjs';
 import {
   fingerprintGitLabEvent,
   getHeader,
@@ -153,7 +153,15 @@ resolver.define('getGitLabIssueEvidence', async ({ payload, context }) => {
   await requireProjectAdmin(projectKey);
   const issueKey = payload?.issueKey;
   await requireVisibleIssue(projectKey, issueKey);
-  return (await kvs.get(getEvidenceKey(projectKey, issueKey))) || null;
+  const config = await kvs.get(getGitLabConfigKey(projectKey));
+  if (!config) return null;
+  return recomputeGitLabIssueEvidence({
+    projectKey,
+    projectId: config.projectId,
+    issueKey,
+    store: kvs,
+    now: Date.now(),
+  });
 });
 
 export async function gitlabWebhook(request) {
