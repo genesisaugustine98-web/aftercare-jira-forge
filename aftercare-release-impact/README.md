@@ -83,3 +83,9 @@ The current dashboard uses UI Kit and the Jira Bridge API directly. A backend re
 The feature branch adds a provider-neutral evidence assessment model and a GitLab pipeline response adapter. The model requires full commit identifiers, separates freshness from result status, and refuses to report a green outcome when no evidence policy is configured. The GitLab adapter validates the configured instance and project, preserves pending/failed/cancelled/skipped states, normalizes CI jobs and aggregate test reports separately, and links a merge request to Jira only when one explicit issue key is present.
 
 These are tested normalization and decision primitives only. Live GitLab API access, secure credential storage, webhooks, evidence persistence and a user-facing release dossier are not implemented yet. See [the revision-bound evidence model](../docs/revision-bound-evidence-model.md) and [the GitLab adapter boundary](../docs/gitlab-evidence-adapter.md).
+
+## Live GitLab connection implementation (development)
+
+The app now contains a server-side GitLab.com read-only connection, encrypted token storage, Jira project-admin authorization, explicit issue-key matching, current-head pipeline/job/test-report collection, and revision/freshness assessment. The connection requires a Forge permission upgrade and a GitLab `read_api` token entered in the Aftercare UI before it can be used in Jira. See [the connection design and verification boundary](../docs/gitlab-forge-connection.md).
+
+This is not a release-readiness approval system: source diffs, validated vulnerability findings, deployment evidence, immutable decision history and production authorization remain out of scope.
