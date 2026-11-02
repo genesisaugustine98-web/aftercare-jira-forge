@@ -250,7 +250,7 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
     counts,
     missingKinds,
     coverage: requiredKinds.length === 0 ? 'unknown' : (missingKinds.length === 0 ? 'present' : 'incomplete'),
-    outcome: requiredKinds.length === 0 || total === 0
+    outcome: requiredKinds.length === 0
       ? 'unknown'
       : (hasBlockingEvidence || counts[EVIDENCE_STATUS.PASSED] === 0
         ? 'needs_review'
