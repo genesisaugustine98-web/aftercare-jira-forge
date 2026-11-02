@@ -98,6 +98,7 @@ test('does not pass evidence when the reviewed change has no valid SHA', () => {
 test('preserves failed, skipped, not-run, missing and conflicting states', () => {
   for (const status of [
     EVIDENCE_STATUS.FAILED,
+    EVIDENCE_STATUS.CANCELLED,
     EVIDENCE_STATUS.SKIPPED,
     EVIDENCE_STATUS.NOT_RUN,
     EVIDENCE_STATUS.MISSING,
