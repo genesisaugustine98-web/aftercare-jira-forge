@@ -495,10 +495,19 @@ const App = () => {
                             </Text>
                           ) : null}
                           {evidenceByIssue[issue.key].assessments?.slice(0, 8).map((assessment) => (
-                            <Text key={assessment.id}>
-                              {assessment.kind}: {assessment.status}
-                              {assessment.freshness ? ` · ${assessment.freshness}` : ''}
-                            </Text>
+                            <Stack key={assessment.evidenceId || assessment.kind} space="space.050">
+                              <Text>
+                                {assessment.kind}: {assessment.status}
+                                {assessment.freshness ? ` · ${assessment.freshness}` : ''}
+                              </Text>
+                              {assessment.details ? (
+                                <Text>
+                                  {Object.entries(assessment.details)
+                                    .map(([detailKey, detailValue]) => `${detailKey}: ${detailValue}`)
+                                    .join(' · ')}
+                                </Text>
+                              ) : null}
+                            </Stack>
                           ))}
                           {evidenceByIssue[issue.key].summary ? (
                             <Text>
