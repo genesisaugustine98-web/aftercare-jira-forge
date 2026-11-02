@@ -15,7 +15,7 @@ const PIPELINE = {
   status: 'success',
   created_at: '2026-10-21T11:09:13.485Z',
   updated_at: '2026-10-21T11:10:21.662Z',
-  web_url: 'https://gitlab.com/acme/showcase/-/pipelines/2971624271',
+  web_url: 'https://gitlab.com/acme/showcase/-/pipelines/9001',
 };
 const JOB = {
   id: 12345,
@@ -39,7 +39,7 @@ test('normalizes a GitLab job with project, pipeline and commit provenance', () 
   const result = normalizeGitLabJob(JOB, { ...OPTIONS, kind: 'test_suite_execution' });
 
   assert.equal(result.valid, true);
-  assert.equal(result.evidence.id, `gitlab:job:${PROJECT_ID}:17346084101`);
+  assert.equal(result.evidence.id, `gitlab:job:${PROJECT_ID}:12345`);
   assert.equal(result.evidence.kind, 'test_suite_execution');
   assert.equal(result.evidence.pipelineId, String(PIPELINE.id));
   assert.equal(result.evidence.commitSha, SHA);
@@ -119,7 +119,7 @@ test('normalizes a real-shape GitLab test report when all 11 tests pass', () => 
       failed_count: 0,
       skipped_count: 0,
       error_count: 0,
-      build_ids: [17346084101],
+      build_ids: [12345],
       suite_error: null,
     }],
   };
