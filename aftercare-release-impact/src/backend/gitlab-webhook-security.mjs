@@ -1,4 +1,5 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 
 export function getHeader(headers, headerName) {
   const match = Object.entries(headers || {}).find(
