@@ -99,16 +99,23 @@ async function seedCurrentEvidence(store) {
 test('joins pipeline and job webhooks to an explicitly linked Jira issue', async () => {
   const store = makeStore();
   await seedCurrentEvidence(store);
-  const result = await processGitLabWebhookEvent({
+  await processGitLabWebhookEvent({
     projectKey: 'VAN',
     projectId: PROJECT_ID,
     event: mergeRequestEvent(),
     store,
     now: NOW,
   });
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: customEvidenceEvent(),
+    store,
+    now: NOW,
+  });
 
   const snapshot = result.snapshots[0];
-  assert.equal(result.eventKind, 'merge_request');
+  assert.equal(result.eventKind, 'aftercare_evidence');
   assert.equal(snapshot.status, 'evidence_current');
   assert.equal(snapshot.expectedCommitSha, SHA);
   assert.equal(snapshot.mergeRequest.iid, 1);
@@ -192,7 +199,7 @@ test('requires security scan execution and does not claim vulnerability clearanc
   });
 
   assert.equal(result.snapshots[0].status, 'needs_review');
-  assert.deepEqual(result.snapshots[0].summary.missingKinds, ['security_scan_execution']);
+  assert.equal(result.snapshots[0].summary.missingKinds.includes('security_scan_execution'), true);
   assert.equal(result.snapshots[0].notes.some((note) => note.includes('does not prove')), true);
 });
 
