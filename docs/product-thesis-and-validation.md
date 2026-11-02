@@ -135,3 +135,10 @@ Do not build a broad “AI release manager” first. AI may summarize evidence o
 The present Forge app is a read-only project context foundation: it retrieves project metadata and up to eight recently updated Jira work items visible to the current user. It has no GitLab connection, release/fix-version scope, evidence dossier, security scanner integration, deployment records, policy engine, immutable decision record, or live Jira-site acceptance test yet.
 
 This is intentionally a small, permission-minimal first deployment. It is **not** the differentiated product MVP described above and must not be marketed as release readiness or production risk analysis.
+
+
+## November 2026 implementation update
+
+The revision-bound evidence foundation and GitLab.com integration are now implemented in the development branch. The integration uses encrypted Forge secret storage for a read-only GitLab token, restricts configuration and evidence inspection to Jira project administrators, links only explicit Jira issue references, and assesses the pipeline, jobs and test report against the exact merge-request head SHA. It uses a 24-hour freshness window and requires pipeline, test-report and security-scan-job-execution evidence before returning `evidence_current`.
+
+The integration is not live until the app installation approves the new `storage:app` scope and GitLab backend egress, and a GitLab `read_api` token is configured in the app. A successful `security_scan` job is execution evidence only, not a claim of zero vulnerabilities. The current stored snapshot is not an immutable audit record, and the app does not yet parse source diffs or deployment evidence or authorize releases.
