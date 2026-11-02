@@ -231,7 +231,15 @@ export function summarizeEvidence(assessments, requiredKinds = []) {
     }
   }
 
-  const presentKinds = new Set((assessments || []).map((item) => item?.kind).filter(Boolean));
+  const nonCoverageStatuses = new Set([
+    EVIDENCE_STATUS.MISSING,
+    EVIDENCE_STATUS.NOT_RUN,
+    EVIDENCE_STATUS.UNAVAILABLE,
+  ]);
+  const presentKinds = new Set((assessments || [])
+    .filter((item) => item && !nonCoverageStatuses.has(item.status))
+    .map((item) => item.kind)
+    .filter(Boolean));
   const missingKinds = [...new Set(requiredKinds)].filter((kind) => !presentKinds.has(kind));
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   const hasBlockingEvidence = [
