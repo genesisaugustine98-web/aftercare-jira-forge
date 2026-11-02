@@ -478,7 +478,7 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
   const affectedIssues = new Set();
   for (const iid of mrIids) {
     const mr = await store.get(mrKey(projectKey, iid));
-    if (mr?.sourceBranch === record.ref) {
+    if (mr && (String(mr.iid) === record.mergeRequestIid || mr.sourceBranch === record.ref)) {
       for (const issueKey of issueKeysForMergeRequest(mr)) affectedIssues.add(issueKey);
     }
   }
