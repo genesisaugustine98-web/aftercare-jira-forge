@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       authorization:
-        description: "Confirm: install Aftercare (DEVELOPMENT) on agkoodaga.atlassian.net with read:jira-work access."
+        description: "Confirm: install Aftercare (DEVELOPMENT) on agkoodaga.atlassian.net with read:jira-work, storage:app and GitLab.com backend egress."
         required: true
         type: choice
         options:
