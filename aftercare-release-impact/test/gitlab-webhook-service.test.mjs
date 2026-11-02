@@ -255,17 +255,19 @@ test('rejects a pipeline event with an untrusted URL', async () => {
   );
 });
 
-test('rejects a job event linked to a different pipeline', async () => {
-  await assert.rejects(
-    processGitLabWebhookEvent({
-      projectKey: 'VAN',
-      projectId: PROJECT_ID,
-      event: jobEvent(101, 'unit_tests', { pipeline_id: 999 }),
-      store: makeStore(),
-      now: NOW,
-    }),
-    /different pipeline/,
-  );
+test('does not associate a job event with an unobserved pipeline', async () => {
+  const store = makeStore();
+  const result = await processGitLabWebhookEvent({
+    projectKey: 'VAN',
+    projectId: PROJECT_ID,
+    event: jobEvent(101, 'unit_tests', { pipeline_id: 999 }),
+    store,
+    now: NOW,
+  });
+
+  assert.deepEqual(result.affectedIssues, []);
+  assert.equal((await store.get('gitlab.VAN.job.101')).pipelineId, '999');
+  assert.equal((await store.get('gitlab.VAN.pipeline.10')), undefined);
 });
 
 test('keeps running jobs as not-run evidence', async () => {
