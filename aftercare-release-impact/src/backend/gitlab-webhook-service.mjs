@@ -176,10 +176,10 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
   }
 
   const expectedCommitSha = normalizeCommitSha(mr.headSha);
-  if (!expectedCommitSha) {
+  if (!expectedCommitSha || !mr.headShaVerified) {
     const snapshot = buildUnavailableSnapshot(
       issueKey,
-      'GitLab has not supplied a full merge-request head commit SHA.',
+      'The current merge-request head SHA has not been confirmed by a merge-request event.',
       now,
     );
     await store.set(key(projectKey, `evidence.${issueKey}`), snapshot);
@@ -337,7 +337,7 @@ async function recomputeIssueSnapshot({ projectKey, projectId, issueKey, store, 
   return snapshot;
 }
 
-async function handleMergeRequest({ projectKey, projectId, event, store, now }) {
+async function handleMergeRequest({ projectKey, projectId, event, store, now, headShaVerified = true }) {
   const attributes = event.object_attributes || {};
   const iid = Number(attributes.iid);
   if (!Number.isSafeInteger(iid) || iid <= 0) {
@@ -377,6 +377,7 @@ async function handleMergeRequest({ projectKey, projectId, event, store, now }) 
     targetBranch: mergeRequest.target_branch,
     webUrl,
     headSha,
+    headShaVerified: Boolean(headSha) && headShaVerified,
     state: attributes.state || attributes.action || 'unknown',
     updatedAt: attributes.updated_at || attributes.created_at || new Date(now).toISOString(),
     linkStatus: link.status,
@@ -440,6 +441,35 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
   };
   await store.set(pipelineKey(projectKey, pipelineId), record);
 
+  // A pipeline event can include a linked MR summary. It may establish a
+  // candidate Jira association, but it cannot independently confirm the MR
+  // head SHA; a merge_request event must confirm that before evidence can pass.
+  const associatedMr = event.merge_request;
+  if (associatedMr?.iid != null && !await store.get(mrKey(projectKey, associatedMr.iid))) {
+    const syntheticMrEvent = {
+      object_kind: 'merge_request',
+      project: { id: projectId },
+      object_attributes: {
+        id: associatedMr.id,
+        iid: associatedMr.iid,
+        title: associatedMr.title || '',
+        description: '',
+        source_branch: associatedMr.source_branch || '',
+        target_branch: associatedMr.target_branch || '',
+        url: associatedMr.url || associatedMr.web_url,
+        state: associatedMr.state || 'unknown',
+        updated_at: pipelineInput.updated_at || pipelineInput.created_at,
+        last_commit: { id: pipelineInput.sha },
+      },
+    };
+    if (isTrustedGitLabUrl(syntheticMrEvent.object_attributes.url)) {
+      await handleMergeRequest({
+        projectKey, projectId, event: syntheticMrEvent, store, now,
+        headShaVerified: false,
+      });
+    }
+  }
+
   const indexComplete = await updateIndex(store, key(projectKey, 'pipeline-index'), pipelineId, true);
   if (!indexComplete) await store.set(key(projectKey, 'pipeline-index-incomplete'), true);
 
@@ -463,17 +493,24 @@ async function handlePipeline({ projectKey, projectId, event, store, now }) {
 
 async function handleJob({ projectKey, projectId, event, store, now }) {
   const pipelineId = event.pipeline_id;
+  const buildId = event.build_id;
+  const projectWebUrl = event.project?.web_url;
+  const derivedJobUrl = isTrustedGitLabUrl(projectWebUrl)
+    && Number.isSafeInteger(Number(buildId)) && Number(buildId) > 0
+    ? `${projectWebUrl.replace(/\/$/, '')}/-/jobs/${buildId}`
+    : undefined;
   const jobInput = {
-    id: event.build_id,
+    id: buildId,
     project_id: projectId,
     status: event.build_status,
     name: event.build_name,
     stage: event.build_stage,
-    web_url: event.build_url,
+    web_url: event.build_url || derivedJobUrl,
     created_at: event.build_created_at,
     started_at: event.build_started_at,
     finished_at: event.build_finished_at,
-    commit: { id: event.commit?.id },
+    // GitLab's job-hook commit.id is not the commit SHA; commit.sha is.
+    commit: { id: event.commit?.sha },
     pipeline: { id: pipelineId },
   };
   const kind = JOB_KIND_BY_NAME[jobInput.name] || 'ci_job';
@@ -546,7 +583,8 @@ export async function processGitLabWebhookEvent({
   if (!event || typeof event !== 'object' || Array.isArray(event)) {
     throw new TypeError('GitLab webhook body must be an object.');
   }
-  if (Number(event.project?.id) !== Number(projectId)) {
+  const eventProjectId = event.project?.id ?? event.project_id;
+  if (Number(eventProjectId) !== Number(projectId)) {
     throw new TypeError('GitLab webhook project ID does not match the configured project.');
   }
 
