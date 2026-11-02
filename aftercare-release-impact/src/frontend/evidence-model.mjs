@@ -196,6 +196,7 @@ function assessment(evidence, status, freshness, reason) {
     commitSha: normalizeCommitSha(evidence?.commitSha),
     pipelineId: evidence?.pipelineId == null ? null : String(evidence.pipelineId),
     observedAt: evidence?.observedAt ?? null,
+    details: evidence?.details && typeof evidence.details === 'object' ? evidence.details : null,
     status,
     freshness,
     reason,
