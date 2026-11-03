@@ -1,4 +1,4 @@
-import api, { webTrigger } from '@forge/api';
+import api, { route, webTrigger } from '@forge/api';
 import { kvs } from '@forge/kvs';
 import Resolver from '@forge/resolver';
 import { randomBytes } from 'node:crypto';
@@ -24,7 +24,7 @@ function getProjectKey(context, payload) {
 
 async function hasProjectAdminPermission(projectKey) {
   const response = await api.asUser().requestJira(
-    `/rest/api/3/mypermissions?projectKey=${encodeURIComponent(projectKey)}&permissions=ADMINISTER_PROJECTS`,
+    route`/rest/api/3/mypermissions?projectKey=${projectKey}&permissions=ADMINISTER_PROJECTS`,
   );
 
   if (!response.ok) {
@@ -48,7 +48,7 @@ async function requireVisibleIssue(projectKey, issueKey) {
   }
 
   const response = await api.asUser().requestJira(
-    `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=summary`,
+    route`/rest/api/3/issue/${issueKey}?fields=summary`,
   );
 
   if (!response.ok) {
