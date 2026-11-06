@@ -40,6 +40,6 @@ See the [application README](aftercare-release-impact/README.md) for current fun
 
 ## Maintenance
 
-The repository uses CI for dependency auditing, tests, linting and authenticated Forge validation when its GitHub Actions secrets are configured. Dependabot proposes weekly npm and GitHub Actions dependency updates. These are proposals only and require maintainer review.
+The repository uses CI for dependency auditing, tests, linting and authenticated Forge validation when its GitHub Actions secrets are configured. CodeQL runs security-extended JavaScript/TypeScript analysis on pushes, pull requests and weekly. Dependabot proposes weekly npm and GitHub Actions dependency updates. These are proposals only and require maintainer review.
 
 The optional Codex maintenance workflow is manually triggered from `main`, requires an `OPENAI_API_KEY` Actions secret, runs with read-only repository access and publishes an advisory report. It does not edit code, merge pull requests, publish releases or deploy the app.
