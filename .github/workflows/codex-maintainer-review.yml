@@ -1,0 +1,63 @@
+name: Codex maintainer review
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    name: Read-only repository maintenance review
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    outputs:
+      report: ${{ steps.codex.outputs.final-message }}
+
+    steps:
+      - name: Check out the trusted main branch
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Keep Codex as the final step in this disposable, single-purpose job.
+      # It receives no repository write token and uses a read-only sandbox.
+      - name: Run Codex maintainer review
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/maintainer-review.md
+          permission-profile: ":read-only"
+          safety-strategy: drop-sudo
+          output-file: codex-maintainer-review.md
+
+  publish-report:
+    name: Publish review report artifact
+    needs: review
+    if: needs.review.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Write report to workspace
+        env:
+          CODEX_REVIEW: ${{ needs.review.outputs.report }}
+        run: |
+          if [[ -z "$CODEX_REVIEW" ]]; then
+            echo "::error::Codex returned an empty report."
+            exit 1
+          fi
+          printf '%s\n' "$CODEX_REVIEW" > codex-maintainer-review.md
+
+      - name: Upload review report
+        uses: actions/upload-artifact@v4
+        with:
+          name: aftercare-codex-maintainer-review
+          path: codex-maintainer-review.md
+          if-no-files-found: error
+          retention-days: 30
