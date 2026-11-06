@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contribution and development guide
+    url: https://github.com/genesisaugustine98-web/aftercare-jira-forge/blob/main/CONTRIBUTING.md
+    about: Read the contributor guide before proposing implementation changes.
+  - name: Pilot testing guide
+    url: https://github.com/genesisaugustine98-web/aftercare-jira-forge/blob/main/docs/pilot-testing.md
+    about: Test Aftercare safely in a development Jira tenant using synthetic data.
+  - name: Security reporting policy
+    url: https://github.com/genesisaugustine98-web/aftercare-jira-forge/blob/main/SECURITY.md
+    about: Report vulnerabilities privately; do not disclose them in public issues.

@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible defect in Aftercare.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include credentials, customer data, private URLs or sensitive logs. Report security vulnerabilities privately using SECURITY.md."
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: Provide the tested commit SHA, tag or app package version.
+      placeholder: "commit SHA or version"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Jira project dashboard
+        - GitLab evidence receiver (development)
+        - CI or tests
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic data and a development tenant.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and redacted evidence
+      description: Jira Cloud, browser, test mode and relevant redacted logs. Never paste secrets or personal data.
+    validations:
+      required: false

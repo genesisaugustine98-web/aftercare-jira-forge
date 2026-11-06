@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest a focused improvement to Aftercare.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What task or failure is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: user
+    attributes:
+      label: Intended user and workflow
+      description: Who needs this, and at what point in their workflow?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Security, permissions and evidence considerations
+      description: What could go wrong? What must remain unknown or human-controlled?
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope acknowledgement
+      options:
+        - label: I understand Aftercare is early-stage and is not production release authority.
+          required: true
